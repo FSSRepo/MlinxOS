@@ -1,0 +1,49 @@
+<html>
+<head>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: Arial;
+            display: block;
+            padding: 20px;
+        }
+        .container {
+            display: block;
+            text-align: center;
+        }
+        #box {
+            width: 100px;
+            height: 100px;
+            background-color: #00ff00;
+            margin: 100px auto;
+            border-radius: 10px;
+            display: block;
+        }
+        .info {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JavaScript style.transform Test</h1>
+        <div id="box"></div>
+        <div class="info" id="status">Rotating...</div>
+    </div>
+
+    <script>
+        const box = document.getElementById('box');
+        let angle = 0;
+
+        function animate() {
+            angle = (angle + 2) % 360;
+            box.style.transform = "rotate(" + angle + "deg) scale(" + (1 + Math.sin(angle * Math.PI / 180) * 0.2) + ")";
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

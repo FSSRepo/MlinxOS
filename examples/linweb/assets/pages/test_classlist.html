@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .box {
+            width: 200px;
+            height: 200px;
+            background-color: blue;
+            transition: all 0.5s;
+        }
+        .red {
+            background-color: red;
+        }
+        .large {
+            width: 400px;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div id="myBox" class="box"></div>
+    <script>
+        const box = document.getElementById('myBox');
+        print('Node found: ' + (box ? 'YES' : 'NO'));
+        if (box) {
+            print('Initial tag: ' + box.tagName);
+            
+            // Test add
+            print('Adding class "red"...');
+            box.classList.add('red');
+            print('Class added.');
+            
+            // Test add multiple
+            
+            // Test remove after delay
+            print('Waiting 10 seconds to remove "red"...');
+            setTimeout(() => {
+                print('Removing class "red"...');
+                print('Adding classes "large" and "extra-class"...');
+                box.classList.add('large');
+                print('Classes added.');
+                box.classList.remove('red');
+                print('Class "red" removed.');
+            }, 10000);
+        }
+    </script>
+</body>
+</html>

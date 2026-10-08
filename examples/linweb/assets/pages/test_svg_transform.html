@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            background-color: #1a1a2e;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+        }
+        .svg-box {
+            width: 120px;
+            height: 120px;
+            margin: 30px;
+            transition: transform 0.5s ease;
+        }
+        .rotate:hover .svg-box {
+            transform: rotate(45deg);
+        }
+        .scale:hover .svg-box {
+            transform: scale(1.5);
+        }
+        .origin-center .svg-box {
+            transform-origin: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>SVG Transform Tests</h1>
+    <p>Hover over each box to test transforms</p>
+    
+    <div class="rotate origin-center">
+        <svg class="svg-box" viewBox="0 0 100 100">
+            <rect width="100" height="100" fill="#e74c3c" rx="10"/>
+            <circle cx="50" cy="50" r="30" fill="#c0392b"/>
+        </svg>
+        <span>Rotate 45deg</span>
+    </div>
+    
+    <div class="scale origin-center">
+        <svg class="svg-box" viewBox="0 0 100 100">
+            <rect width="100" height="100" fill="#3498db" rx="10"/>
+            <circle cx="50" cy="50" r="30" fill="#2980b9"/>
+        </svg>
+        <span>Scale 1.5x</span>
+    </div>
+</body>
+</html>

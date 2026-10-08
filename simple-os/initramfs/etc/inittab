@@ -1,0 +1,8 @@
+::sysinit:/bin/mount -t proc none /proc
+::sysinit:/bin/mount -t sysfs none /sys
+::sysinit:/bin/mount -t devtmpfs none /dev
+::sysinit:/bin/mount -t devpts none /dev/pts
+
+tty1::respawn:/bin/getty -L tty1 115200 vt100
+
+::shutdown:/sbin/poweroff -f

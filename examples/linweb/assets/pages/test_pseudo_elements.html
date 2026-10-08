@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Pseudo-elementos ::before y ::after</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 40px;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #2e2eb3 0%, #6a82c5 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .test-case {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #fcfcfcaf;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .test-case h2 {
+            margin-top: 0;
+            color: #ff6b6b;
+            font-size: 1.2rem;
+        }
+
+        .label {
+            font-size: 1.1rem;
+            color: #f0f0f0;
+        }
+
+        .label::before {
+            content: "→ ";
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .label::after {
+            content: " ←";
+            color: #00d4ff;
+            font-weight: bold;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #c0c0c0;
+            border: 1px solid #0400ff;
+            border-radius: 20px;
+            margin: 8px;
+        }
+
+        .badge::before {
+            content: "★ ";
+            color: #ffd700;
+        }
+
+        .badge::after {
+            content: " ★";
+            color: #ffd700;
+        }
+
+        .quote {
+            font-style: italic;
+            color: #b0b0b0;
+            padding: 16px;
+            border-left: 4px solid #ff6b6b;
+            background: rgba(255, 107, 107, 0.05);
+            margin: 16px 0;
+        }
+
+        .quote::before {
+            content: '"';
+            font-size: 2rem;
+            color: #ff6b6b;
+            line-height: 1;
+        }
+
+        .quote::after {
+            content: '"';
+            font-size: 2rem;
+            color: #ff6b6b;
+            line-height: 1;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .status::before {
+            content: "✓ ";
+            color: #00ff88;
+            font-size: 1.2rem;
+        }
+
+        .status::after {
+            content: " ✓";
+            color: #00ff88;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test de Pseudo-elementos CSS</h1>
+    <div class="test-container">
+        <div class="test-case">
+            <h2>Test 1: Flechas con ::before y ::after</h2>
+            <div class="label">Texto con flechas</div>
+        </div>
+
+        <div class="test-case">
+            <h2>Test 2: Estrellas decorativas</h2>
+            <div>
+                <span class="badge">Nuevo</span>
+                <span class="badge">Destacado</span>
+                <span class="badge">Popular</span>
+            </div>
+        </div>
+
+        <div class="test-case">
+            <h2>Test 3: Comillas para citas</h2>
+            <div class="quote">Los pseudo-elementos son muy utiles</div>
+        </div>
+
+        <div class="status">
+            Todos los tests de pseudo-elementos ejecutandose correctamente
+        </div>
+    </div>
+</body>
+</html>

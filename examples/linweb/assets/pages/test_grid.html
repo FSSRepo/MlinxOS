@@ -1,0 +1,41 @@
+<html>
+<head>
+    <style>
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            background-color: #f0f0f0;
+            padding: 20px;
+            margin: 20px;
+        }
+        .grid-item {
+            background-color: #3498db;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid #2980b9;
+        }
+        .item2 { background-color: #e74c3c; border-color: #c0392b; }
+        .item3 { background-color: #2ecc71; border-color: #27ae60; }
+        .item4 { background-color: #f1c40f; border-color: #f39c12; }
+        
+        .title {
+            text-align: center;
+            font-size: 32px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">Soporte de CSS Grid</div>
+    <div class="grid-container">
+        <div class="grid-item">Item 1 (1fr)</div>
+        <div class="grid-item item2">Item 2 (1fr)</div>
+        <div class="grid-item item3">Item 3 (1fr)</div>
+        <div class="grid-item item4">Item 4 (Nueva Fila)</div>
+        <div class="grid-item">Item 5</div>
+        <div class="grid-item item2">Item 6</div>
+    </div>
+</body>
+</html>

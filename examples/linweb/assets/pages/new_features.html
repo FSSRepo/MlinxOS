@@ -1,0 +1,77 @@
+
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .card {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .scroll-container {
+            max-height: 40px;
+            overflow: scroll;
+            border: 2px solid #3498db;
+            padding: 10px;
+            background-color: #cbfffc;
+        }
+        .mc-box {
+            background-color: #f7f7ff;
+            border: 1px dashed #b7b7ff;
+            padding: 10px;
+        }
+        .mc-a { margin-bottom: 30px; }
+        .mc-b { margin-top: 20px; }
+        h1 { color: #2c3e50; }
+        .bold-text { font-weight: bold; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <h1>Demo de Nuevas Funciones</h1>
+    
+    <div class="card">
+        <h3>Tipografía y Estilos</h3>
+        <p>Este es un texto normal.</p>
+        <p class="bold-text">Este texto usa font-weight: bold.</p>
+        <p>También soportamos <strong>etiquetas strong</strong> por defecto.</p>
+    </div>
+
+    <div class="card">
+        <h3>Elementos Inline y Espacios</h3>
+        <p>La etiqueta <code>code</code> ahora se comporta como un span.</p>
+        <p>Prueba de espacios: [<code> inicio </code>] [<code>fin </code>] [<code> ninguno </code>].</p>
+        <p>Los espacios entre <strong>strong</strong> y <em>em</em> deben preservarse.</p>
+    </div>
+
+    <div class="card">
+        <h3>Contenedor con Scroll</h3>
+        <div class="scroll-container">
+            <p><strong>Inicio del contenido largo.</strong></p>
+            <p>Este contenedor tiene un <code>max-height: 150px</code> y <code>overflow: scroll</code>.</p>
+            <p>Puedes ver cómo el texto se mantiene dentro de los límites del borde azul.</p>
+            <p>Línea de relleno 1...</p>
+            <p>Línea de relleno 2...</p>
+            <p>Línea de relleno 3...</p>
+            <p><strong>Fin del contenido largo.</strong></p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Colapso de Margenes</h3>
+        <div class="mc-box mc-a">Bloque A: margin-bottom 30px</div>
+        <div class="mc-box mc-b">Bloque B: margin-top 20px (gap esperado: 30px)</div>
+    </div>
+
+    <div class="card" style="max-height: 60px; overflow: hidden; border-color: #e67e22;">
+        <h3>Overflow Hidden</h3>
+        <p>Este contenedor tiene <code>overflow: hidden</code> y una altura muy pequeña.</p>
+        <p>Este texto no debería verse porque está fuera del límite.</p>
+    </div>
+</body>
+</html>

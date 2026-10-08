@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            background-color: #1a1a2e;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding-top: 50px;
+        }
+        .key-display {
+            font-size: 48px;
+            margin: 30px;
+            min-height: 60px;
+            color: #f1c40f;
+        }
+        .instructions {
+            font-size: 18px;
+            color: #bdc3c7;
+            margin-top: 20px;
+        }
+        .box {
+            width: 200px;
+            height: 200px;
+            background-color: #e74c3c;
+            margin: 30px auto;
+            border-radius: 10px;
+            transition: transform 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <h1>Keyboard Events Test</h1>
+    <div class="key-display" id="display">Press any key...</div>
+    <div class="instructions">
+        <p>Use Arrow keys, Enter, Escape, Space</p>
+    </div>
+    <div class="box" id="box"></div>
+
+    <script>
+        const display = document.getElementById('display');
+        const box = document.getElementById('box');
+        
+        document.addEventListener('keydown', function(e) {
+            display.innerText = 'keydown: ' + e.key + ' (' + e.keyCode + ')';
+            box.style.backgroundColor = '#2ecc71';
+            
+            if (e.keyCode === 37) box.style.transform = 'translateX(-20px)';
+            if (e.keyCode === 39) box.style.transform = 'translateX(20px)';
+            if (e.keyCode === 38) box.style.transform = 'translateY(-20px)';
+            if (e.keyCode === 40) box.style.transform = 'translateY(20px)';
+        });
+        
+        document.addEventListener('keyup', function(e) {
+            display.innerText = 'keyup: ' + e.key + ' (' + e.keyCode + ')';
+            box.style.backgroundColor = '#e74c3c';
+            box.style.transform = 'translate(0,0)';
+        });
+    </script>
+</body>
+</html>

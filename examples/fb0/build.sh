@@ -1,0 +1,1 @@
+gcc fb.c -o fbi

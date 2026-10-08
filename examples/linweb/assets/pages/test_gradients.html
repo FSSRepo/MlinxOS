@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    background: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 50px;
+  }
+  .box {
+    width: 200px;
+    height: 200px;
+    margin: 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-family: sans-serif;
+  }
+  .linear {
+    background: linear-gradient(45deg, #ff0000, #0000ff);
+  }
+  .linear-to-right {
+    background: linear-gradient(to right, #00ff00, #ff00ff);
+  }
+  .radial {
+    background: radial-gradient(#ffff00, #000000);
+  }
+</style>
+</head>
+<body>
+  <h1 style="text-align: center;">Gradient Test</h1>
+  <div class="box linear">Linear 45deg</div>
+  <div class="box linear-to-right">Linear to Right</div>
+  <div class="box radial">Radial</div>
+</body>
+</html>

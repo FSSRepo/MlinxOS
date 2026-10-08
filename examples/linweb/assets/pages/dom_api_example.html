@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .box {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            color: white;
+            font-weight: bold;
+        }
+        .blue-box { background-color: #3498db; }
+        .green-box { background-color: #2ecc71; }
+        .red-box { background-color: #e74c3c; }
+        
+        #controls {
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background-color: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DOM API Example</h1>
+        <p>This example demonstrates <code>document.createElement</code> and <code>appendChild</code>.</p>
+        
+        <div id="controls">
+            <button id="add-btn">Add New Element</button>
+            <button id="clear-btn">Clear Content (innerHTML = '')</button>
+            <button id="update-text-btn">Update Last Text (innerText)</button>
+        </div>
+        
+        <div id="content-area">
+            <div class="box blue-box">Initial Element</div>
+        </div>
+    </div>
+
+    <script>
+        let count = 0;
+        let lastElement = null;
+        const addBtn = document.getElementById('add-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const updateTextBtn = document.getElementById('update-text-btn');
+        const contentArea = document.getElementById('content-area');
+
+        addBtn.addEventListener('click', () => {
+            count++;
+            console.log('Button clicked! Adding element #' + count);
+            
+            // Create a new div
+            const newDiv = document.createElement('div');
+            
+            // Set some text using textContent
+            newDiv.textContent = 'Dynamic Element #' + count;
+            
+            // Set styles and classes
+            newDiv.classList.add('box');
+            
+            if (count % 2 === 0) {
+                newDiv.classList.add('green-box');
+            } else {
+                newDiv.classList.add('red-box');
+            }
+            
+            // Append to the content area
+            contentArea.appendChild(newDiv);
+            lastElement = newDiv;
+            
+            // You can even append children to the new element
+            const small = document.createElement('span');
+            small.innerText = ' (just added)';
+            small.style.fontSize = '12px';
+            small.style.opacity = '0.7';
+            small.style.marginLeft = '10px';
+            newDiv.appendChild(small);
+        });
+
+        clearBtn.addEventListener('click', () => {
+            console.log('Clearing content area...');
+            contentArea.innerHTML = '';
+            count = 0;
+            lastElement = null;
+        });
+
+        updateTextBtn.addEventListener('click', () => {
+            if (lastElement) {
+                console.log('Updating last element text via innerText');
+                lastElement.innerText = 'Updated via innerText! (' + new Date().toLocaleTimeString() + ')';
+            } else {
+                console.log('No element to update');
+            }
+        });
+    </script>
+</body>
+</html>

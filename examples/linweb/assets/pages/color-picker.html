@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    background: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  .container {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .color-preview {
+    width: 200px;
+    height: 100px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    background: #ff0000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .controls {
+    display: flex;
+    gap: 10px;
+  }
+  .btn {
+    padding: 10px 15px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    color: white;
+  }
+  .red { background: #ff4d4d; }
+  .green { background: #4dff4d; }
+  .blue { background: #4d4dff; }
+  .random { background: #333; }
+  
+  .btn:hover {
+    opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Selector de Colores</h1>
+    <div class="color-preview">#ff0000</div>
+    <div class="controls">
+      <div class="btn red">Rojo</div>
+      <div class="btn green">Verde</div>
+      <div class="btn blue">Azul</div>
+      <div class="btn random">Aleatorio</div>
+    </div>
+  </div>
+
+  <script>
+    const preview = document.getElementsByClassName('color-preview')[0];
+    
+    document.getElementsByClassName('red')[0].addEventListener('click', () => {
+      preview.style.backgroundColor = '#ff0000';
+    });
+    
+    document.getElementsByClassName('green')[0].addEventListener('click', () => {
+      preview.style.backgroundColor = '#00ff00';
+    });
+    
+    document.getElementsByClassName('blue')[0].addEventListener('click', () => {
+      preview.style.backgroundColor = '#0000ff';
+    });
+    
+    document.getElementsByClassName('random')[0].addEventListener('click', () => {
+      const r = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+      const g = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+      const b = Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+      const color = '#' + r + g + b;
+      preview.style.backgroundColor = color;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            grid-template-rows: 80px 1fr;
+            gap: 10px;
+            background-color: #ecf0f1;
+            padding: 20px;
+            height: 400px;
+        }
+        .grid-item {
+            background-color: #3498db;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .item-header {
+            grid-column: 1 / 4;
+            background-color: #e74c3c;
+        }
+        .item-sidebar {
+            background-color: #2ecc71;
+        }
+        .item-main {
+            background-color: #f1c40f;
+        }
+    </style>
+</head>
+<body>
+    <h1>Advanced CSS Grid Test</h1>
+    <div class="grid-container">
+        <div class="grid-item item-header">Header (1 / 4)</div>
+        <div class="grid-item item-sidebar">Sidebar</div>
+        <div class="grid-item item-main">Main Content</div>
+        <div class="grid-item item-sidebar">Sidebar 2</div>
+    </div>
+</body>
+</html>

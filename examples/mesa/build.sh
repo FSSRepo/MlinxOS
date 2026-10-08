@@ -1,0 +1,1 @@
+gcc  main.c -o triangle3d -lGL -lOSMesa -lm

@@ -1,0 +1,151 @@
+body {
+    margin: 0;
+    padding: 0;
+    /* Base background of ps3.html */
+    background: linear-gradient(180deg, #79b35a 0%, #5c8f3e 100%);
+    background-attachment: fixed;
+    color: #ffffff;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+}
+
+#app {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#xmb-container {
+    position: absolute;
+    top: 30%;
+    left: 0;
+    width: 100%;
+    transform: translateY(-50%);
+}
+
+#main-menu {
+    display: flex;
+    align-items: flex-start;
+    padding-left: 0;
+    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: transform;
+}
+
+.menu-item {
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.4s ease;
+    opacity: 0.4;
+    filter: blur(1px);
+}
+
+.menu-item.active {
+    opacity: 1;
+    filter: blur(0);
+    animation: selectionBlink 1.5s infinite ease-in-out;
+}
+
+@keyframes selectionBlink {
+    0%, 100% { opacity: 1; filter: drop-shadow(0 0 15px rgba(255,255,255,0.6)); }
+    50% { opacity: 0.7; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2)); }
+}
+
+.menu-icon {
+    width: 4rem;
+    height: 4rem;
+    filter: invert(1) drop-shadow(0 0 10px rgba(255,255,255,0.2));
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.menu-item.active .menu-icon {
+    width: 6rem;
+    height: 6rem;
+    filter: invert(1) drop-shadow(0 0 15px rgba(255,255,255,0.5));
+}
+
+.menu-item span {
+    font-size: 1.4rem;
+    opacity: 0;
+    margin-top: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.4s ease;
+    color: rgba(255,255,255,0.9);
+}
+
+.menu-item.active span {
+    opacity: 1;
+}
+
+#submenu-container {
+    position: absolute;
+    top: 200px; /* Below the main menu */
+    left: 300px; /* Aligned with the active item which is at 200px (initial offset) */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.submenu-item {
+    font-size: 2rem;
+    font-weight: 300;
+    color: rgba(255,255,255,0.5);
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    text-align: left;
+    padding: 5px 20px;
+    border-radius: 5px;
+}
+
+.submenu-item.active {
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 400;
+    text-shadow: 0 0 15px rgba(255,255,255,0.5);
+    animation: submenuBlink 1.5s infinite ease-in-out;
+}
+
+.submenu-item.above-active {
+    transform: translateY(-15rem);
+}
+
+@keyframes submenuBlink {
+    0%, 100% { opacity: 1; text-shadow: 0 0 15px rgba(255,255,255,0.8); }
+    50% { opacity: 0.6; text-shadow: 0 0 5px rgba(255,255,255,0.2); }
+}
+
+header {
+    position: absolute;
+    top: 40px;
+    right: 60px;
+    text-align: right;
+}
+
+header h1 {
+    font-size: 1.2rem;
+    font-weight: 300;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+#status {
+    position: absolute;
+    bottom: 40px;
+    left: 60px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: left;
+}

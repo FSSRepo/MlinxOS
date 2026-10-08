@@ -1,0 +1,66 @@
+.blue-box { 
+    background-color: blue; 
+    display: block; 
+    padding: 20px;
+    margin: 10px;
+    border-radius: 20px;
+    transition: all 0.5s ease;
+    box-sizing: border-box;
+    box-shadow: 10px 10px 20px rgba(0,0,0,0.5);
+    border: 5px solid darkblue;
+}
+.blue-box:hover {
+    background-color: cyan;
+    width: 40%;
+    border-radius: 50%;
+    box-shadow: 0px 0px 30px cyan;
+}
+
+.red-box { 
+    background-color: red; 
+    display: inline-block;
+    width: 30%;
+    padding: 20px;
+    margin: 10px;
+    border-radius: 10px;
+    transition: all 1.0s ease-in;
+    box-sizing: content-box;
+    box-shadow: 5px 5px 10px #000;
+}
+.red-box:hover {
+    background-color: #fdc255;
+    border-radius: 50px;
+    padding: 40px;
+}
+
+.green-box { 
+    background-color: #008000; 
+    display: inline-block;
+    padding: 20px;
+    margin: 10px;
+    color: #00ff00;
+    transition: all 0.5s ease;
+}
+.green-box:hover {
+    background-color: #00ff00;
+}
+
+.main { 
+    background-color: white; 
+    display: block;
+}
+
+h1, h2, h3 {
+    margin: 5px 0;
+}
+
+p {
+    color: #333333;
+}
+
+span {
+    color: #ff00ff;
+    padding: 10px;
+    margin-left: 10px;
+    background-color: #333333;
+}

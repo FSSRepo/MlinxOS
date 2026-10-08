@@ -1,0 +1,85 @@
+# Architecture and Toolchain
+# Sets the system architecture to 64-bit x86
+BR2_x86_64=y
+# Uses custom Linux 6.12 kernel headers for the toolchain
+BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_6_12=y
+# Enables C++ language support in the toolchain
+BR2_TOOLCHAIN_BUILDROOT_CXX=y
+# Forces hash verification for all downloads (stronger security)
+BR2_DOWNLOAD_FORCE_CHECK_HASHES=y
+
+BR2_GLOBAL_PATCH_DIR="mlinxos_config/patches"
+
+# System Identity and Scripts
+# System hostname
+BR2_TARGET_GENERIC_HOSTNAME="MLinxOS"
+# Welcome message shown at login
+BR2_TARGET_GENERIC_ISSUE="Welcome to MLinxOS"
+# Arguments passed to the post-build script (the current defconfig file)
+
+BR2_ROOTFS_POST_BUILD_SCRIPT="mlinxos_config/post-build.sh"
+BR2_ROOTFS_POST_SCRIPT_ARGS="$(BR2_DEFCONFIG)"
+BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV=y
+
+# Linux Kernel
+# Enables the Linux kernel build
+BR2_LINUX_KERNEL=y
+# Indicates that a custom kernel version will be used
+BR2_LINUX_KERNEL_CUSTOM_VERSION=y
+# Specifies the exact kernel version (6.12.47)
+BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.12.47"
+# Indicates that a custom kernel configuration file will be used
+BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
+# Path to the kernel configuration file (.config)
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="mlinxos_config/linux.config"
+
+# Builds the kernel image in vmlinux format
+BR2_LINUX_KERNEL_BZIMAGE=y
+# Uses XZ compression for the kernel image
+BR2_LINUX_KERNEL_XZ=y
+# The kernel needs the host libelf library to build
+BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF=y
+
+# Includes the Mesa3D library for graphics rendering
+BR2_PACKAGE_MESA3D=y
+BR2_PACKAGE_MESA3D_LLVM=y
+BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVMPIPE=y
+BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_VIRGL=y
+BR2_PACKAGE_MESA3D_OPENGL_GLX=y
+BR2_PACKAGE_MESA3D_OPENGL_EGL=y
+BR2_PACKAGE_MESA3D_OPENGL_ES=y
+BR2_PACKAGE_XORG7=y
+BR2_PACKAGE_XSERVER_XORG_SERVER=y
+BR2_PACKAGE_XDRIVER_XF86_VIDEO_FBDEV=y
+BR2_PACKAGE_XDRIVER_XF86_VIDEO_VESA=y
+BR2_PACKAGE_XLIB_LIBXAW=y
+BR2_PACKAGE_XAPP_SETXKBMAP=y
+BR2_PACKAGE_XDRIVER_XF86_INPUT_EVDEV=y
+BR2_PACKAGE_XDRIVER_XF86_INPUT_LIBINPUT=y
+BR2_PACKAGE_EUDEV_RULES_GEN=y
+BR2_PACKAGE_LIBDRM_INTEL=y
+BR2_PACKAGE_LIBXKBCOMMON=y
+BR2_PACKAGE_LIBXKBCOMMON_TOOLS=y
+
+BR2_PACKAGE_MTDEV=y
+# Library for handling generic input devices (keyboard, mouse)
+BR2_PACKAGE_LIBEVDEV=y
+
+# System Utilities
+# (Disabled) Scripts for ifup/ifdown network interfaces
+# BR2_PACKAGE_IFUPDOWN_SCRIPTS is not set
+# Base Linux utilities package (mount, fdisk, etc.)
+BR2_PACKAGE_UTIL_LINUX=y
+
+# Filesystem and Bootloader
+BR2_TARGET_ROOTFS_CPIO=y
+BR2_TARGET_ROOTFS_CPIO_FULL=y
+# BR2_TARGET_ROOTFS_CPIO_DRACUT is not set
+# BR2_TARGET_ROOTFS_CPIO_NONE is not set
+BR2_TARGET_ROOTFS_CPIO_GZIP=y
+# Enables the GRUB2 bootloader
+BR2_TARGET_GRUB2=y
+# Configures GRUB2 to boot from a "CD" partition (ISO)
+BR2_TARGET_GRUB2_BOOT_PARTITION="cd"
+# GRUB2 modules to include in the boot image (support for ext2, fat, squashfs, etc.)
+BR2_TARGET_GRUB2_BUILTIN_MODULES_PC="boot linux ext2 fat squash4 part_msdos part_gpt normal biosdisk iso9660"

@@ -33,14 +33,22 @@ All three share the hostname `MLinxOS` and the welcome message `Welcome to MLinx
 
 ## Automated setup
 
-From the repo root, `init-buildroot.sh` automates the manual steps below: it installs the
-Buildroot dependencies, downloads and extracts Buildroot 2025.11, then asks which projects
-to distribute its source to — creating one tree per selected project (`../<project>`, next
-to the repo) with the project's configuration layer overlaid.
+From the repository root, initialize only the Wayland Buildroot tree:
 
 ```bash
-bash init-buildroot.sh
+bash init-buildroot.sh --project wayland-os --non-interactive
 ```
+
+If host dependencies are already installed, skip apt. Add `--force` to overlay an existing
+Buildroot project tree:
+
+```bash
+bash init-buildroot.sh --project wayland-os --skip-deps --force --non-interactive
+```
+
+The initializer installs `grub-pc-bin`, `xorriso`, and `mtools`, which are needed to create
+the ISO. Add `--with-qemu` to install QEMU too. Continue with the ordered build and ISO flow
+in [wayland-os/README.md](wayland-os/README.md#ordered-build-and-iso-flow).
 
 The sections below describe the same steps manually.
 
@@ -63,7 +71,7 @@ Key ones: `bison`/`flex` (kernel 6.12.47), `libelf-dev` (the defconfigs enable
 To boot the ISOs in QEMU:
 
 ```bash
-sudo apt install -y qemu-system-x86 grub-pc-bin xorriso
+sudo apt install -y qemu-system-x86 grub-pc-bin xorriso mtools
 ```
 
 Only for the didactic `simple-os` ISO (needs root for `busybox --install`):

@@ -61,7 +61,7 @@ public:
                            float shadow_r = 0.0f, float shadow_g = 0.0f, float shadow_b = 0.0f, float shadow_a = 0.0f,
                            float shadow_offset_x = 0.0f, float shadow_offset_y = 0.0f, float shadow_blur = 0.0f,
                            int tex_width = 0, int tex_height = 0);
-    static void draw_text(const std::string& text, float x, float y, float font_size = 16.0f, float r = 0.0f, float g = 0.0f, float b = 0.0f, float a = 1.0f, bool is_bold = false, float blur = 0.0f, float invert = 0.0f, bool is_monospace = false);
+    static void draw_text(const std::string& text, float x, float y, float font_size = 16.0f, float r = 0.0f, float g = 0.0f, float b = 0.0f, float a = 1.0f, bool is_bold = false, float blur = 0.0f, float invert = 0.0f, bool is_monospace = false, float line_height = 0.0f);
 
 private:
     static void render_box(const std::shared_ptr<LayoutBox>& box, float inherited_opacity = 1.0f, const Filter& inherited_filter = Filter());

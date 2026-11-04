@@ -313,8 +313,16 @@ namespace linweb
         std::string font_family = styled_node->value("font-family");
         bool is_monospace = (font_family == "monospace");
 
+        size_t line_count = 1;
+        for (size_t i = 0; i < text_data.size(); ++i) {
+            if (text_data[i] == '\n' || text_data[i] == '\r') {
+                ++line_count;
+                if (text_data[i] == '\r' && i + 1 < text_data.size() && text_data[i + 1] == '\n')
+                    ++i;
+            }
+        }
         dimensions.content.width = Renderer::measure_text(text_data, font_size, is_bold, is_monospace);
-        dimensions.content.height = line_height;
+        dimensions.content.height = line_height * static_cast<float>(line_count);
     }
 
     /**
@@ -461,7 +469,7 @@ namespace linweb
         std::string min_h_str = styled_node->value("min-height");
         std::string max_h_str = styled_node->value("max-height");
 
-        float children_height = (children.empty() && styled_node->node->type() == NodeType::Text) ? this->line_height : (current_y_offset + max_line_height);
+        float children_height = (children.empty() && styled_node->node->type() == NodeType::Text) ? dimensions.content.height : (current_y_offset + max_line_height);
 
         // Add padding and border to total_content_height for scrollable areas
         total_content_height = children_height + dimensions.padding.top + dimensions.padding.bottom + dimensions.border.top + dimensions.border.bottom;

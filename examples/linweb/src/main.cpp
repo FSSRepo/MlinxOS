@@ -229,6 +229,8 @@ int main(int argc, char** argv) {
     keyboard_handler.set_js_engine(g_js_engine);
 
     js.add_function("print", js_console_log);
+    js.add_function("__glRendererInfo", js_gl_renderer_info);
+    js.add_function("__glDrainErrors", js_gl_drain_errors);
     js.add_function("__setStyleProperty", js_set_style_property);
     js.add_function("__setStylePropertyById", js_set_style_property_by_id);
     js.add_function("__setStylePropertyByAddr", js_set_style_property_by_addr);
@@ -256,7 +258,15 @@ int main(int argc, char** argv) {
         "  warn: (...args) => print('WARN:', ...args),"
         "  info: (...args) => print('INFO:', ...args)"
         "};"
+        "const linweb = {"
+        "  renderer: { info: () => __glRendererInfo() },"
+        "  debug: {"
+        "    renderer: () => { const info = __glRendererInfo(); console.info('OpenGL renderer', info); return info; },"
+        "    glErrors: () => { const errors = __glDrainErrors(); if (errors.length) console.error('OpenGL errors', errors); return errors; }"
+        "  }"
+        "};"
         "const window = {"
+        "  linweb: linweb,"
         "  _listeners: {},"
         "  _raf_callbacks: [],"
         "  _timeouts: [],"

@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('App loaded');
     const statusElement = document.getElementById('status');
+    const systemInfoPanel = document.getElementById('system-info');
     statusElement.innerText = 'Application ready for webOS';
 
     // Handle webOS events if available
@@ -11,7 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Submenu data
     const subMenuData = {
-        'System': ['System Settings', 'Network Settings', 'System Update', 'Users'],
+        'System': ['System Info', 'Renderer Debug', 'System Settings', 'Network Settings', 'System Update', 'Users'],
         'Games': ['Store', 'Library', 'Last Played', 'Trophies'],
         'Multimedia': ['Music Player', 'Photo Gallery', 'Video Player', 'YouTube'],
         'DVD': ['Play Disc', 'Disc Info', 'Eject']
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateSubMenuHighlight() {
         const subItems = document.querySelectorAll('.submenu-item');
         subItems.forEach((item, i) => {
+            item.classList.remove('debug-open');
             if (i === subMenuIndex) {
                 item.classList.add('active');
             } else {
@@ -113,16 +115,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 subMenuIndex++;
                 updateSubMenuHighlight();
             }
-        } else if (e.keyCode === 13) { // OK / Enter
+        } else if (e.key === 'Enter' || e.keyCode === 13 || e.keyCode === 10) { // OK / Enter
             if (subMenuIndex === -1) {
                 subMenuIndex = 0;
                 updateSubMenuHighlight();
             } else {
                 const items = subMenuData[menuItems[currentIndex].getAttribute('data-name')];
-                console.log('Selected:', items[subMenuIndex]);
-                statusElement.innerText = `Running ${items[subMenuIndex]}...`;
+                const selected = items[subMenuIndex];
+                const selectedElement = document.querySelectorAll('.submenu-item')[subMenuIndex];
+                console.log('Selected:', selected);
+                if (selected === 'System Info' || selected === 'Renderer Debug') {
+                    selectedElement.classList.remove('active');
+                    selectedElement.classList.add('debug-open');
+                    const gpu = linweb.renderer.info();
+                    const glErrors = selected === 'Renderer Debug' ? linweb.debug.glErrors() : [];
+                    systemInfoPanel.innerText = [
+                        'MLinxOS system information',
+                        'Session: X.Org / EGL / OpenGL',
+                        `GPU vendor: ${gpu.vendor}`,
+                        `Renderer: ${gpu.renderer}`,
+                        `OpenGL: ${gpu.version}`,
+                        `GLSL: ${gpu.shadingLanguageVersion}`,
+                        `Rendering: ${gpu.software ? 'SOFTWARE (llvmpipe/softpipe)' : (gpu.renderer === 'unavailable' ? 'renderer unavailable' : 'hardware renderer reported')}`,
+                        `OpenGL errors: ${glErrors.length ? glErrors.join(', ') : 'none'}`,
+                        'Press Esc to close'
+                    ].join('\n');
+                    systemInfoPanel.classList.add('visible');
+                    statusElement.innerText = selected;
+                    if (selected === 'Renderer Debug') linweb.debug.renderer();
+                } else {
+                    systemInfoPanel.classList.remove('visible');
+                    statusElement.innerText = `Running ${selected}...`;
+                }
             }
         } else if (e.keyCode === 461 || e.keyCode === 27) { // Back (webOS o ESC)
+            systemInfoPanel.classList.remove('visible');
             if (subMenuIndex > -1) {
                 subMenuIndex = -1;
                 updateSubMenuHighlight();

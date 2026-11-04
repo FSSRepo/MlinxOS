@@ -29,7 +29,10 @@ static Key map_x11_key(KeySym keysym) {
     if (keysym >= XK_0 && keysym <= XK_9)
         return static_cast<Key>(static_cast<int>(Key::Num0) + (keysym - XK_0));
     switch (keysym) {
-        case XK_Return: return Key::Enter;
+        case XK_Return:
+        case XK_KP_Enter:
+        case XK_ISO_Enter:
+        case XK_Linefeed: return Key::Enter;
         case XK_Escape: return Key::Escape;
         case XK_space: return Key::Space;
         case XK_BackSpace: return Key::Backspace;
@@ -76,9 +79,9 @@ bool Window::init(int width, int height, const std::string& title) {
 
     XSetWindowAttributes swa;
     swa.override_redirect = False;
-    swa.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |
+    swa.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask | FocusChangeMask |
                      ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
-                     StructureNotifyMask;
+                     StructureNotifyMask | EnterWindowMask;
 
     impl_->win = XCreateWindow(
         impl_->dpy, root,
@@ -91,6 +94,9 @@ bool Window::init(int width, int height, const std::string& title) {
         &swa);
 
     XMapWindow(impl_->dpy, impl_->win);
+    // This kiosk session starts Xorg without a window manager. Request focus
+    // explicitly so the keyboard is routed to Linweb as soon as it appears.
+    XSetInputFocus(impl_->dpy, impl_->win, RevertToParent, CurrentTime);
     XStoreName(impl_->dpy, impl_->win, title_.c_str());
 
     Atom wm_delete_window = XInternAtom(impl_->dpy, "WM_DELETE_WINDOW", False);
@@ -207,6 +213,12 @@ void Window::poll_events() const {
                 }
                 break;
             }
+            case MapNotify:
+            case EnterNotify:
+            case FocusOut:
+                // No window manager: keep claiming the keyboard focus.
+                XSetInputFocus(impl_->dpy, impl_->win, RevertToParent, CurrentTime);
+                break;
             case DestroyNotify:
                 self->impl_->should_close = true;
                 break;

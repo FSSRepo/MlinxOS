@@ -859,7 +859,8 @@ namespace linweb {
             float scaled_ascent = RendererState::font_ascent_px * scale;
             float font_height = RendererState::font_line_height_px * scale;
 
-            float extra_leading = std::max(0.0f, box->dimensions.content.height - font_height);
+            float text_line_height = box->line_height > 0.0f ? box->line_height : font_height;
+            float extra_leading = std::max(0.0f, text_line_height - font_height);
             float y_offset = extra_leading / 2.0f;
 
             std::string font_weight = box->styled_node->value("font-weight");
@@ -869,10 +870,10 @@ namespace linweb {
 
             BoxShadow text_shadow = resolve_text_shadow(box);
             if (text_shadow.active) {
-                draw_text(text_node->data, box->dimensions.content.x + text_shadow.offsetX, box->dimensions.content.y + y_offset + scaled_ascent + text_shadow.offsetY, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, text_shadow.blur + combined_filter.blur, combined_filter.invert, is_monospace);
+                draw_text(text_node->data, box->dimensions.content.x + text_shadow.offsetX, box->dimensions.content.y + y_offset + scaled_ascent + text_shadow.offsetY, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, text_shadow.blur + combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
             }
 
-            draw_text(text_node->data, box->dimensions.content.x, box->dimensions.content.y + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace);
+            draw_text(text_node->data, box->dimensions.content.x, box->dimensions.content.y + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
             if (debug_type == DebugType::Text)
             {
                 draw_rect(box->dimensions.content.x, box->dimensions.content.y,
@@ -897,7 +898,8 @@ namespace linweb {
             float scaled_ascent = RendererState::font_ascent_px * scale;
             float font_height = RendererState::font_line_height_px * scale;
 
-            float extra_leading = std::max(0.0f, box->dimensions.content.height - font_height);
+            float text_line_height = box->line_height > 0.0f ? box->line_height : font_height;
+            float extra_leading = std::max(0.0f, text_line_height - font_height);
             float y_offset = extra_leading / 2.0f;
 
             std::string font_weight = box->styled_node->value("font-weight");
@@ -907,10 +909,10 @@ namespace linweb {
 
             BoxShadow text_shadow = resolve_text_shadow(box);
             if (text_shadow.active) {
-                draw_text(pseudo_node->pseudo_content, box->dimensions.content.x + text_shadow.offsetX, box->dimensions.content.y + y_offset + scaled_ascent + text_shadow.offsetY, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, text_shadow.blur + combined_filter.blur, combined_filter.invert, is_monospace);
+                draw_text(pseudo_node->pseudo_content, box->dimensions.content.x + text_shadow.offsetX, box->dimensions.content.y + y_offset + scaled_ascent + text_shadow.offsetY, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, text_shadow.blur + combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
             }
 
-            draw_text(pseudo_node->pseudo_content, box->dimensions.content.x, box->dimensions.content.y + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace);
+            draw_text(pseudo_node->pseudo_content, box->dimensions.content.x, box->dimensions.content.y + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
         }
 
         auto model_with_scroll = RendererState::current_model;

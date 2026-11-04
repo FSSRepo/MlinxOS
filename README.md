@@ -50,6 +50,9 @@ The initializer installs `grub-pc-bin`, `xorriso`, and `mtools`, which are neede
 the ISO. Add `--with-qemu` to install QEMU too. Continue with the ordered build and ISO flow
 in [wayland-os/README.md](wayland-os/README.md#ordered-build-and-iso-flow).
 
+To switch an existing Wayland Buildroot tree to the X.Org profile while retaining its build
+outputs and downloads, follow the [X.Org reuse flow](xorg-os/README.md#ordered-build-and-iso-flow).
+
 The sections below describe the same steps manually.
 
 ---

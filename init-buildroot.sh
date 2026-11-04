@@ -16,6 +16,7 @@ INSTALL_DEPS=1
 INSTALL_QEMU=0
 FORCE=0
 NON_INTERACTIVE=0
+REUSE_TREE=
 
 usage() {
     cat <<EOF
@@ -30,6 +31,8 @@ Options:
       --force              Overlay configuration when the target exists.
       --non-interactive    Fail instead of prompting for missing choices.
       --buildroot-dir DIR  Use an existing Buildroot 2025.11 tree.
+      --reuse-tree DIR     Overlay one project onto an existing Buildroot tree,
+                           preserving its output/ and downloads for incremental builds.
   -h, --help               Show this help.
 
 Example: bash init-buildroot.sh --project wayland-os --non-interactive
@@ -83,6 +86,11 @@ while (($#)); do
             BR_BASE=$(cd "$2" && pwd)
             shift 2
             ;;
+        --reuse-tree)
+            (($# >= 2)) || { echo "ERROR: --reuse-tree requires an existing Buildroot project tree." >&2; exit 2; }
+            REUSE_TREE=$(cd "$2" && pwd)
+            shift 2
+            ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: unknown option: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -103,6 +111,15 @@ install_deps() {
 }
 
 download_buildroot() {
+    if [[ -n "$REUSE_TREE" ]]; then
+        [[ -f "$REUSE_TREE/Makefile" ]] || { echo "ERROR: not a Buildroot tree: $REUSE_TREE" >&2; return 1; }
+        if grep -Eq "^export BR2_VERSION[[:space:]]*(:=|=)[[:space:]]*${BR_VERSION}([[:space:]]|$)" "$REUSE_TREE/Makefile"; then
+            echo ">> Reusing Buildroot ${BR_VERSION} tree at $REUSE_TREE."
+            return 0
+        fi
+        echo "ERROR: $REUSE_TREE is not Buildroot ${BR_VERSION}." >&2
+        return 1
+    fi
     if [[ -d "$BR_BASE" ]]; then
         echo ">> Reusing Buildroot tree at $BR_BASE."
     else
@@ -138,13 +155,25 @@ select_projects() {
 
 distribute() {
     local project src target answer
+    if [[ -n "$REUSE_TREE" && ${#SELECTED[@]} -ne 1 ]]; then
+        echo "ERROR: --reuse-tree requires exactly one selected project." >&2
+        return 2
+    fi
     for project in "${SELECTED[@]}"; do
         src="${SCRIPT_DIR}/${project}"
         target="${PARENT_DIR}/${project}"
+        [[ -z "$REUSE_TREE" ]] || target=$REUSE_TREE
         [[ -d "$src" ]] || { echo "ERROR: missing layer $src" >&2; return 1; }
 
         echo ">> Preparing ${project} at ${target}"
-        if [[ -e "$target" ]]; then
+        if [[ -n "$REUSE_TREE" ]]; then
+            [[ -f "$target/Makefile" ]] || { echo "ERROR: not a Buildroot tree: $target" >&2; return 1; }
+            if ! grep -Eq "^export BR2_VERSION[[:space:]]*(:=|=)[[:space:]]*${BR_VERSION}([[:space:]]|$)" "$target/Makefile"; then
+                echo "ERROR: $target is not Buildroot ${BR_VERSION}." >&2
+                return 1
+            fi
+            answer=y
+        elif [[ -e "$target" ]]; then
             if (( FORCE )); then
                 answer=y
             elif (( NON_INTERACTIVE )); then

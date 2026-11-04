@@ -21,6 +21,7 @@ A browser-style engine that parses HTML, CSS, and JavaScript to render web pages
 - Timer bindings (setTimeout, requestAnimationFrame)
 - Console API (console.log, .error, .warn, .info)
 - Browser-like globals: `document`, `window`, `console`
+- Linweb diagnostics: `linweb.renderer.info()` reports the active OpenGL vendor, renderer, GL/GLSL versions, and a software-rendering flag. `linweb.debug.renderer()` logs that report and `linweb.debug.glErrors()` drains and logs pending GL errors.
 
 **Input Handling:**
 - Keyboard (keydown/keyup events)

@@ -1,12 +1,22 @@
 #include "renderer/text_renderer.h"
 #include "renderer/renderer_internal.h"
+#include <algorithm>
 
 namespace linweb {
 
 float Renderer::measure_text(const std::string& text, float font_size, bool is_bold, bool is_monospace) {
     float xpos = 0;
+    float max_width = 0;
     float scale = font_size / RendererState::base_font_size;
-    for (char c : text) {
+    for (size_t i = 0; i < text.size(); ++i) {
+        char c = text[i];
+        if (c == '\r' || c == '\n') {
+            max_width = std::max(max_width, xpos);
+            xpos = 0;
+            if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+                ++i;
+            continue;
+        }
         if (c < 32 || c >= 128) continue;
         stbtt_bakedchar *b;
         if (is_monospace)
@@ -17,14 +27,14 @@ float Renderer::measure_text(const std::string& text, float font_size, bool is_b
             b = &RendererState::cdata[c - 32];
         xpos += b->xadvance * scale;
     }
-    return xpos;
+    return std::max(max_width, xpos);
 }
 
 float Renderer::get_line_height(float font_size) {
     return RendererState::font_line_height_px * (font_size / RendererState::base_font_size);
 }
 
-void Renderer::draw_text(const std::string& text, float x, float y, float font_size, float r, float g, float b, float a, bool is_bold, float blur, float invert, bool is_monospace) {
+void Renderer::draw_text(const std::string& text, float x, float y, float font_size, float r, float g, float b, float a, bool is_bold, float blur, float invert, bool is_monospace, float line_height) {
     if (!RendererState::program_text || RendererState::vbo_text == 0) return;
     if (!is_monospace && RendererState::ftex == 0) return;
     if (is_monospace && RendererState::ftex_mono == 0) return;
@@ -32,11 +42,20 @@ void Renderer::draw_text(const std::string& text, float x, float y, float font_s
     float xpos = x;
     float ypos = y;
     float scale = font_size / RendererState::base_font_size;
+    float line_advance = line_height > 0.0f ? line_height : get_line_height(font_size);
 
     std::vector<float> verts;
     verts.reserve(text.size() * 6 * 8);
 
-    for (char c : text) {
+    for (size_t i = 0; i < text.size(); ++i) {
+        char c = text[i];
+        if (c == '\r' || c == '\n') {
+            xpos = x;
+            ypos += line_advance;
+            if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+                ++i;
+            continue;
+        }
         if (c < 32 || c >= 128) continue;
         stbtt_bakedchar *bc;
         if (is_monospace)

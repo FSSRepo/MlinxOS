@@ -47,7 +47,10 @@ mkdir -p output/iso/boot/grub
     find . -print0 | cpio --quiet --null -o --format=newc | gzip -9
 ) > output/iso/boot/initramfs.img
 
-grub-mkrescue -o "$ISO_PATH" output/iso
+# BIOS-only El Torito image (no EFI/GPT/APM/HFS+), like the reference ISO.
+GRUB_PC_DIR=${GRUB_PC_DIR:-/usr/lib/grub/i386-pc}
+[[ -d "$GRUB_PC_DIR" ]] || { echo "ERROR: $GRUB_PC_DIR not found. Install grub-pc-bin." >&2; exit 1; }
+grub-mkrescue -d "$GRUB_PC_DIR" -o "$ISO_PATH" output/iso
 echo "ISO created: $ISO_PATH"
 
 if (( RUN_QEMU )); then

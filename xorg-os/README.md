@@ -1,54 +1,95 @@
 # xorg-os
 
-Minimalist system based on **Buildroot 2025.11** that boots the **X.Org server** with
-**Mesa3D** (`llvmpipe` + `virgl`, GLX/EGL/OpenGL ES).
+Minimal system based on **Buildroot 2025.11**. It boots X.Org with Mesa3D, including
+llvmpipe software rendering, GLX/EGL/OpenGL ES, and the virtio GPU where available. Weston is
+not selected in this profile.
 
-Requirements and dependencies: see the [main README](../README.md).
+See the [main README](../README.md) for host requirements and dependencies.
 
 ## Layer contents
 
-```
+```text
 xorg-os/
-├── configs/mlinxos_defconfig      # Buildroot defconfig
-├── mlinxos_config/                # linux.config, post-build.sh, patches/*.hash
-├── init.sh                        # make mlinxos_defconfig && make menuconfig
-├── build.sh                       # make + init + grub.cfg + ISO
-├── automate.sh                    # autolaunch a custom binary with X.Org
-└── make-iso.sh                    # cpio + grub-mkrescue + QEMU
+  configs/mlinxos_defconfig       Buildroot configuration for X.Org and Mesa
+  mlinxos_config/                 Kernel config, post-build hook, patches
+  init.sh                         Select the defconfig and optionally open menuconfig
+  build.sh                        Build, install Xorg startup, and prepare ISO files
+  automate.sh                     Install an app and configure Xorg autostart
+  make-iso.sh                     Build the initramfs and ISO; optionally run QEMU
 ```
 
-## Prepare the Buildroot tree
+## Ordered build and ISO flow
+
+The recommended path reuses the existing Wayland Buildroot tree on the build server. It keeps
+`output/` and downloaded sources, overlays the X.Org configuration, then lets Buildroot rebuild
+packages affected by the profile change. This avoids starting from a fresh Buildroot extraction;
+X.Org, Mesa, or other packages whose options differ can still be rebuilt.
+
+Run from the repository root, setting the path to the existing Buildroot tree. Here the tree is
+`../wayland-os`; change that path if it lives elsewhere.
 
 ```bash
-cd ~/buildroot-2025.11
-SRC=/path/to/steward-os/xorg-os
-cp $SRC/configs/mlinxos_defconfig configs/
-cp -r $SRC/mlinxos_config .
-cp $SRC/*.sh .
+cd /path/to/steward-os
+SRC="$PWD"
+bash ./init-buildroot.sh --project xorg-os --reuse-tree ../wayland-os --skip-deps --non-interactive
 ```
 
-## Build
+Configure the X.Org defconfig and build. The init script applies checked-in defaults without
+opening the interactive menu; use `--menuconfig` only when you intend to change them.
+It also adjusts Buildroot's Mesa Kconfig so Iris keeps LLVM and Mesa's SPIR-V precompilation
+tools without enabling OpenCL. This prevents target Clang and libclc from being included just
+because Iris needs the precompilation path; the Iris OpenGL driver and LLVM remain enabled.
 
 ```bash
-bash init.sh       # select the defconfig (opens menuconfig)
-bash build.sh      # build + write init + ISO; asks to run QEMU
+cd ../wayland-os
+bash init.sh --no-menuconfig
+bash build.sh --refresh-mesa --jobs "$(nproc)" --no-iso
 ```
 
-Output: `hello-world.iso`. QEMU runs with 512 MB and a virtual GPU
-(`-device virtio-vga,virgl=on`); the serial console is multiplexed with the monitor
-(`Ctrl-A C` toggles it). Regenerate/run the ISO alone with `bash make-iso.sh`.
+`build.sh` compiles the selected Buildroot configuration, verifies the kernel and initramfs,
+copies the kernel into the ISO tree, and relies on Buildroot's `S40xorg` service to start the
+server. It removes the old Weston service/config from a reused target tree. Use
+`--refresh-mesa` on the first switch from an already-built Wayland tree: it rebuilds Mesa with
+the X.Org GLX settings in staging while preserving the Buildroot toolchain, LLVM and other
+packages. The build script also removes stale Weston and Wayland runtime files left in the
+reused target directory. Normal subsequent build runs can omit `--refresh-mesa`.
 
-Optional autolaunch of your own app:
+Cross-compile the X11/EGL examples for the Buildroot sysroot, install the cube, and generate
+the ISO:
 
 ```bash
-bash automate.sh   # asks binary/args/cwd, writes /etc/init.d/S90app
+bash "$SRC/examples/xorg/build.sh" --buildroot "$PWD"
+bash automate.sh --binary "$SRC/examples/xorg/bin/cube"
+bash make-iso.sh --no-qemu --output hello-world.iso
 ```
 
-The service waits for `/tmp/.X11-unix/X0` before starting the application.
+The result is `hello-world.iso` in the Buildroot tree. `automate.sh` installs the app under
+`output/target/usr/bin`, creates `S90app`, and starts it with `DISPLAY=:0` after the Xorg socket
+appears. To use the triangle example, substitute `triangle` for `cube`.
+
+To pass app arguments or select its working directory:
+
+```bash
+bash automate.sh --binary /path/to/my_app --args "--fullscreen" --cwd /root
+```
+
+On a graphical host, use `bash make-iso.sh --qemu`. For a host without OpenGL support, add
+`--no-virgl`; use `--no-qemu` on a headless build server.
+
+## CLI options
+
+- `init-buildroot.sh`: `--project`, `--projects`, `--skip-deps`, `--force`, `--non-interactive`,
+  `--buildroot-dir`, and `--reuse-tree`.
+- `init.sh`: `--no-menuconfig` or `--menuconfig`.
+- `build.sh`: `--jobs N`, `--refresh-mesa`, `--no-iso`, `--make-iso`, or `--make-and-run`.
+- `examples/xorg/build.sh`: `--buildroot DIR` and `--triplet TARGET`.
+- `automate.sh`: `--binary FILE|NAME`, `--args STRING`, and `--cwd DIRECTORY`.
+- `make-iso.sh`: `--output FILE`, `--no-qemu` or `--qemu`, `--memory MB`, `--display BACKEND`,
+  and `--no-virgl`.
 
 ## Usage
 
-Inside the booted system:
+Launch an X11 application inside the booted system with:
 
 ```bash
 DISPLAY=:0 <application>
@@ -56,9 +97,12 @@ DISPLAY=:0 <application>
 
 ## Troubleshooting
 
-- **`build.sh` now runs the full cycle** (`make` + kernel copy + ISO `grub.cfg`); previously
-  it only wrote `output/target/init`. The ISO `grub.cfg` must point to `/boot/vmlinuz` and
-  `/boot/initramfs.img`.
-- **Xorg won't start in QEMU** → check the DRM driver (`CONFIG_DRM_VIRTIO_GPU`), the RAM
-  size, and the X server log; without host `gl=on`, boot without `virgl=on`.
-- General build issues → [main README](../README.md#troubleshooting-general).
+- The post-build hook must be executable. `init-buildroot.sh` sets its executable bit when it
+  distributes the layer.
+- If ISO creation reports that `xorriso` or `mformat` is missing, install `xorriso` and `mtools`.
+- `build.sh` checks that `output/images/bzImage` and `output/images/rootfs.cpio.gz` exist before
+  continuing. The defconfig produces `bzImage`.
+- If Xorg does not start, inspect `/var/log/Xorg.0.log` and confirm `CONFIG_DRM_VIRTIO_GPU` is
+  enabled. Try `--no-virgl` if the QEMU host lacks OpenGL support.
+- If the app starts before Xorg, inspect `/var/log/Xorg.0.log` and `/tmp/.X11-unix/X0`.
+- For other build issues, see the [main README](../README.md#troubleshooting).

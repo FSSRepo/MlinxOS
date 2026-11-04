@@ -117,6 +117,16 @@ body {
     animation: submenuBlink 1.5s infinite ease-in-out;
 }
 
+/* Keep the activated diagnostics item steady; some lightweight renderers
+   incorrectly tint text while interpolating this animation. */
+.submenu-item.debug-open {
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 400;
+    text-shadow: none;
+    animation: none;
+}
+
 .submenu-item.above-active {
     transform: translateY(-15rem);
 }
@@ -148,4 +158,26 @@ header h1 {
     font-size: 0.9rem;
     color: rgba(255, 255, 255, 0.5);
     text-align: left;
+}
+
+#system-info {
+    display: none;
+    position: absolute;
+    right: 60px;
+    bottom: 36px;
+    max-width: 48%;
+    margin: 0;
+    padding: 18px 22px;
+    color: #fff;
+    background: rgba(8, 18, 24, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    font: 14px/1.55 monospace;
+    white-space: pre-wrap;
+    z-index: 5;
+}
+
+
+#system-info.visible {
+    display: block;
 }

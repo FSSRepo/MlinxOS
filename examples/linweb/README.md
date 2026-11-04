@@ -22,6 +22,7 @@ A browser-style engine that parses HTML, CSS, and JavaScript to render web pages
 - Console API (console.log, .error, .warn, .info)
 - Browser-like globals: `document`, `window`, `console`
 - Linweb diagnostics: `linweb.renderer.info()` reports the active OpenGL vendor, renderer, GL/GLSL versions, and a software-rendering flag. `linweb.debug.renderer()` logs that report and `linweb.debug.glErrors()` drains and logs pending GL errors.
+- Storage: `linweb.storage` works with block devices on Linux. `list()` returns the disks, their partitions, filesystem (ext2/3/4 or FAT, read from the superblock), label, size and mount point. `mount(dev)` / `unmount(path)` mount under `/mnt/<name>`, and `format(dev, 'ext4' | 'vfat', label, confirmName)` runs `mkfs`; `confirmName` must equal the device name, and mounted, read-only or optical devices are refused. `readDir`, `readFile(path, maxBytes)`, `writeFile`, `makeDir` and `remove` are confined to `/mnt` (symlinks and `..` cannot escape). Every call returns `{ ok, error, ... }`. Formatting blocks the UI until `mkfs` ends.
 
 **Input Handling:**
 - Keyboard (keydown/keyup events)
@@ -31,6 +32,10 @@ A browser-style engine that parses HTML, CSS, and JavaScript to render web pages
 **Debug Tools:**
 - Node tree overlay (`--debug` flag)
 - Debug visualizer for inspecting elements
+
+**Tests:**
+- `g++ -std=c++17 -Isrc tests/storage_test.cpp src/system/storage.cpp -o /tmp/storage_test && /tmp/storage_test` checks filesystem detection, `mkfs`, device enumeration, and the path confinement (needs `mkfs.ext4` and `mkfs.vfat`).
+- `node tests/ps3_storage_test.js` drives the PS3 menu's Storage category with a fake DOM and an in-memory `linweb.storage`.
 
 ### ogl-3d
 A 3D OpenGL demo with:

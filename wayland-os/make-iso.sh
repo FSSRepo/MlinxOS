@@ -7,6 +7,8 @@ ISO_PATH=hello-world.iso
 MEMORY=512
 DISPLAY_BACKEND=gtk
 VIRGL=1
+DISK_FILE=
+DISK_SIZE_MB=512
 usage() {
     cat <<'EOF'
 Usage: bash make-iso.sh [options]
@@ -18,6 +20,8 @@ Options:
   --memory MB         QEMU memory (default: 512).
   --display BACKEND   QEMU display backend (default: gtk).
   --no-virgl           Disable virgl and OpenGL acceleration in QEMU.
+  --disk FILE         Attach FILE as a raw virtio disk in QEMU; it is created (sparse) when missing.
+  --disk-size MB      Size used when --disk creates the file (default: 512).
   -h, --help          Show this help.
 EOF
 }
@@ -29,12 +33,15 @@ while (($#)); do
         --memory) (($# >= 2)) || { echo "ERROR: --memory requires a value." >&2; exit 2; }; MEMORY=$2; shift 2 ;;
         --display) (($# >= 2)) || { echo "ERROR: --display requires a value." >&2; exit 2; }; DISPLAY_BACKEND=$2; shift 2 ;;
         --no-virgl) VIRGL=0; shift ;;
+        --disk) (($# >= 2)) || { echo "ERROR: --disk requires a path." >&2; exit 2; }; DISK_FILE=$2; shift 2 ;;
+        --disk-size) (($# >= 2)) || { echo "ERROR: --disk-size requires a value." >&2; exit 2; }; DISK_SIZE_MB=$2; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: unknown option: $1" >&2; usage >&2; exit 2 ;;
     esac
 done
 
 [[ "$MEMORY" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: invalid memory size: $MEMORY" >&2; exit 2; }
+[[ "$DISK_SIZE_MB" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: invalid disk size: $DISK_SIZE_MB" >&2; exit 2; }
 [[ -d output/target ]] || { echo "ERROR: output/target not found." >&2; exit 1; }
 [[ -f output/iso/boot/vmlinuz ]] || { echo "ERROR: output/iso/boot/vmlinuz not found. Run build.sh first." >&2; exit 1; }
 command -v cpio >/dev/null || { echo "ERROR: cpio is required." >&2; exit 1; }
@@ -59,6 +66,13 @@ if (( RUN_QEMU )); then
         QEMU_ARGS+=(-device virtio-vga,virgl=on -display "$DISPLAY_BACKEND",gl=on)
     else
         QEMU_ARGS+=(-device virtio-vga -display "$DISPLAY_BACKEND")
+    fi
+    if [[ -n "$DISK_FILE" ]]; then
+        if [[ ! -e "$DISK_FILE" ]]; then
+            truncate -s "${DISK_SIZE_MB}M" "$DISK_FILE"
+            echo "Created blank ${DISK_SIZE_MB} MB disk: $DISK_FILE"
+        fi
+        QEMU_ARGS+=(-drive "file=$DISK_FILE,format=raw,if=virtio")
     fi
     qemu-system-x86_64 "${QEMU_ARGS[@]}"
 fi

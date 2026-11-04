@@ -69,6 +69,8 @@ set(LINWEB_SOURCES
     src/scripting/event_bindings.cpp
     src/scripting/timer_bindings.cpp
     src/scripting/console_bindings.cpp
+    src/scripting/storage_bindings.cpp
+    src/system/storage.cpp
     src/utils/file_utils.cpp
     src/utils/dom_traversal.cpp
     src/utils/layout_traversal.cpp

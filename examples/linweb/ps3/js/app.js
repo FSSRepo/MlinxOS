@@ -10,12 +10,13 @@ document.addEventListener('DOMContentLoaded', function() {
         statusElement.innerText += ' (webOS detected)';
     }
 
-    // Submenu data
+    // Submenu data. "Storage" is built from the detected disks (see js/storage.js).
     const subMenuData = {
         'System': ['System Info', 'Renderer Debug', 'System Settings', 'Network Settings', 'System Update', 'Users'],
         'Games': ['Store', 'Library', 'Last Played', 'Trophies'],
         'Multimedia': ['Music Player', 'Photo Gallery', 'Video Player', 'YouTube'],
-        'DVD': ['Play Disc', 'Disc Info', 'Eject']
+        'DVD': ['Play Disc', 'Disc Info', 'Eject'],
+        'Storage': []
     };
 
     // Menu navigation handling
@@ -25,12 +26,31 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentIndex = 0;
     let subMenuIndex = -1; // -1 means we are in the main menu
 
+    const storageUI = (typeof createStorageUI === 'function') ? createStorageUI({
+        panel: document.getElementById('storage-panel'),
+        title: document.getElementById('sp-title'),
+        subtitle: document.getElementById('sp-subtitle'),
+        list: document.getElementById('sp-list'),
+        hint: document.getElementById('sp-hint'),
+        setStatus: (text) => { statusElement.innerText = text; },
+        onItemsChanged: () => { loadSubMenu('Storage', true); }
+    }) : null;
+
+    function currentCategory() {
+        return menuItems[currentIndex].getAttribute('data-name');
+    }
+
+    function currentSubItems() {
+        if (currentCategory() === 'Storage') return storageUI ? storageUI.labels() : [];
+        return subMenuData[currentCategory()] || [];
+    }
+
     function updateActiveItem(index) {
         // In the XMB, the active item stays at a fixed position
         // and the container scrolls.
         // We calculate the offset based on the index
         const itemWidth = 150; // Approximate width of each item + margin
-        const offset = 300 - (index * itemWidth); 
+        const offset = 300 - (index * itemWidth);
         mainMenu.style.transform = `translateX(${offset}px)`;
 
         menuItems.forEach((item, i) => {
@@ -44,18 +64,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function loadSubMenu(category) {
+    function loadSubMenu(category, keepIndex) {
+        const previousIndex = subMenuIndex;
         subMenuContainer.innerHTML = '';
-        const items = subMenuData[category] || [];
-        
+        if (category === 'Storage') {
+            if (storageUI) storageUI.buildItems();
+        }
+        const items = (category === 'Storage') ? (storageUI ? storageUI.labels() : []) : (subMenuData[category] || []);
+
         items.forEach((text, index) => {
             const div = document.createElement('div');
             div.className = 'submenu-item';
             div.innerText = text;
-            subMenuContainer.appendChild(div); 
+            subMenuContainer.appendChild(div);
         });
-        
-        subMenuIndex = -1; // Reset when changing category
+
+        // Reset when changing category; keep the position when only refreshing the list
+        subMenuIndex = keepIndex ? Math.min(previousIndex, items.length - 1) : -1;
         updateSubMenuHighlight();
     }
 
@@ -92,7 +117,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Example of key handling for the remote control
     document.addEventListener('keydown', function(e) {
         console.log('Key pressed:', e.keyCode);
-        
+
+        // The storage panel (actions, file browser, confirmations) owns the keys while open.
+        if (storageUI && storageUI.isOpen()) {
+            storageUI.handleKey(e);
+            return;
+        }
+
         if (e.keyCode === 37) { // Left
             if (subMenuIndex === -1) {
                 currentIndex = (currentIndex > 0) ? currentIndex - 1 : menuItems.length - 1;
@@ -104,13 +135,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateActiveItem(currentIndex);
             }
         } else if (e.keyCode === 38) { // Up
-            const items = subMenuData[menuItems[currentIndex].getAttribute('data-name')];
             if (subMenuIndex > -1) {
                 subMenuIndex--;
                 updateSubMenuHighlight();
             }
         } else if (e.keyCode === 40) { // Down
-            const items = subMenuData[menuItems[currentIndex].getAttribute('data-name')];
+            const items = currentSubItems();
             if (subMenuIndex < items.length - 1) {
                 subMenuIndex++;
                 updateSubMenuHighlight();
@@ -119,8 +149,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (subMenuIndex === -1) {
                 subMenuIndex = 0;
                 updateSubMenuHighlight();
+            } else if (currentCategory() === 'Storage') {
+                if (storageUI) storageUI.activate(subMenuIndex);
             } else {
-                const items = subMenuData[menuItems[currentIndex].getAttribute('data-name')];
+                const items = currentSubItems();
                 const selected = items[subMenuIndex];
                 const selectedElement = document.querySelectorAll('.submenu-item')[subMenuIndex];
                 console.log('Selected:', selected);

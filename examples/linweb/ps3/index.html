@@ -30,6 +30,10 @@
                         <img src="dvd.svg" alt="DVD" class="menu-icon">
                         <span>DVD</span>
                     </div>
+                    <div class="menu-item" data-name="Storage">
+                        <img src="storage.svg" alt="Storage" class="menu-icon">
+                        <span>Storage</span>
+                    </div>
                 </nav>
                 <div id="submenu-container">
                     <!-- The submenu items will be loaded here dynamically -->
@@ -37,8 +41,15 @@
             </div>
             <div id="status">Ready</div>
             <pre id="system-info" aria-live="polite"></pre>
+            <div id="storage-panel">
+                <div id="sp-title"></div>
+                <pre id="sp-subtitle"></pre>
+                <div id="sp-list"></div>
+                <div id="sp-hint"></div>
+            </div>
         </main>
     </div>
+    <script src="js/storage.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,18 @@
+#!/bin/sh
+DAEMON=/usr/sbin/steward-httpd
+PIDFILE=/var/run/steward-httpd.pid
+case "$1" in
+    start)
+        printf 'Starting Steward HTTP on port 8080: '
+        start-stop-daemon -S -q -b -m -p "$PIDFILE" --exec "$DAEMON" -- 8080 && echo OK || exit 1
+        ;;
+    stop)
+        start-stop-daemon -K -q -p "$PIDFILE" --exec "$DAEMON" || exit 1
+        rm -f "$PIDFILE"
+        ;;
+    restart)
+        "$0" stop
+        "$0" start
+        ;;
+    *) echo "Usage: $0 {start|stop|restart}"; exit 1 ;;
+esac

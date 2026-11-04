@@ -18,6 +18,7 @@
 #include "scripting/dom_bindings.h"
 #include "scripting/style_bindings.h"
 #include "scripting/console_bindings.h"
+#include "scripting/storage_bindings.h"
 #include "utils/file_utils.h"
 #include "utils/dom_traversal.h"
 #include "utils/layout_traversal.h"
@@ -231,6 +232,15 @@ int main(int argc, char** argv) {
     js.add_function("print", js_console_log);
     js.add_function("__glRendererInfo", js_gl_renderer_info);
     js.add_function("__glDrainErrors", js_gl_drain_errors);
+    js.add_function("__storageList", js_storage_list);
+    js.add_function("__storageMount", js_storage_mount);
+    js.add_function("__storageUnmount", js_storage_unmount);
+    js.add_function("__storageFormat", js_storage_format);
+    js.add_function("__storageListDir", js_storage_list_dir);
+    js.add_function("__storageReadFile", js_storage_read_file);
+    js.add_function("__storageWriteFile", js_storage_write_file);
+    js.add_function("__storageMakeDir", js_storage_make_dir);
+    js.add_function("__storageRemove", js_storage_remove);
     js.add_function("__setStyleProperty", js_set_style_property);
     js.add_function("__setStylePropertyById", js_set_style_property_by_id);
     js.add_function("__setStylePropertyByAddr", js_set_style_property_by_addr);
@@ -263,6 +273,17 @@ int main(int argc, char** argv) {
         "  debug: {"
         "    renderer: () => { const info = __glRendererInfo(); console.info('OpenGL renderer', info); return info; },"
         "    glErrors: () => { const errors = __glDrainErrors(); if (errors.length) console.error('OpenGL errors', errors); return errors; }"
+        "  },"
+        "  storage: {"
+        "    list: () => __storageList(),"
+        "    mount: (dev) => __storageMount(dev),"
+        "    unmount: (path) => __storageUnmount(path),"
+        "    format: (dev, fs, label, confirm) => __storageFormat(dev, fs, label || '', confirm || ''),"
+        "    readDir: (path) => __storageListDir(path),"
+        "    readFile: (path, maxBytes) => __storageReadFile(path, maxBytes || 0),"
+        "    writeFile: (path, data) => __storageWriteFile(path, String(data)),"
+        "    makeDir: (path) => __storageMakeDir(path),"
+        "    remove: (path) => __storageRemove(path)"
         "  }"
         "};"
         "const window = {"

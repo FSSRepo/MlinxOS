@@ -181,3 +181,57 @@ header h1 {
 #system-info.visible {
     display: block;
 }
+
+/* Storage panel (disk list actions, file browser, confirmations) */
+#storage-panel {
+    display: none;
+    position: absolute;
+    right: 60px;
+    top: 140px;
+    width: 46%;
+    padding: 18px 22px;
+    color: #fff;
+    background: rgba(8, 18, 24, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    font: 15px/1.5 monospace;
+    z-index: 6;
+}
+
+#storage-panel.visible {
+    display: block;
+}
+
+#sp-title {
+    font-size: 20px;
+    margin-bottom: 6px;
+}
+
+#sp-subtitle {
+    margin: 0 0 12px 0;
+    color: rgba(255, 255, 255, 0.65);
+    font: 13px/1.5 monospace;
+    white-space: pre-wrap;
+}
+
+.sp-item {
+    padding: 3px 10px;
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.75);
+    white-space: nowrap;
+}
+
+.sp-item.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.sp-item.danger.active {
+    background: rgba(200, 60, 60, 0.7);
+}
+
+#sp-hint {
+    margin-top: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+}

@@ -74,7 +74,9 @@ bash automate.sh --binary /path/to/my_app --args "--fullscreen" --cwd /root
 ```
 
 On a graphical host, use `bash make-iso.sh --qemu`. For a host without OpenGL support, add
-`--no-virgl`; use `--no-qemu` on a headless build server.
+`--no-virgl`; use `--no-qemu` on a headless build server. To attach a raw virtio disk (created when
+missing, 512 MB unless `--disk-size MB` is given), add `--disk disk.img`; see `wayland-os/README.md`
+for what the PS3 menu's Storage category can do with it.
 
 ## CLI options
 
@@ -85,7 +87,7 @@ On a graphical host, use `bash make-iso.sh --qemu`. For a host without OpenGL su
 - `examples/xorg/build.sh`: `--buildroot DIR` and `--triplet TARGET`.
 - `automate.sh`: `--binary FILE|NAME`, `--args STRING`, and `--cwd DIRECTORY`.
 - `make-iso.sh`: `--output FILE`, `--no-qemu` or `--qemu`, `--memory MB`, `--display BACKEND`,
-  and `--no-virgl`.
+  `--no-virgl`, `--disk FILE`, and `--disk-size MB`.
 
 ## Usage
 

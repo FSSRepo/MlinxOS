@@ -67,6 +67,21 @@ To create the ISO and launch it on a graphical host, run `bash make-iso.sh --qem
 without OpenGL support, use `bash make-iso.sh --qemu --no-virgl`. For a headless build server,
 keep `--no-qemu` so ISO generation does not try to open a display.
 
+### Disks in QEMU
+
+The kernel supports virtio, SCSI and IDE disks, MBR/GPT partitions, ext4 and FAT, and the image
+includes `mkfs.ext4` and `mkfs.vfat`. Attach a raw disk image to try it; `--disk` creates the
+file (512 MB unless `--disk-size MB` is given) when it does not exist and exposes it as `/dev/vda`:
+
+```bash
+bash make-iso.sh --qemu --no-virgl --disk disk.img
+```
+
+In the PS3 menu, the **Storage** category lists the disks. Select one to mount or unmount it,
+browse its files, create a test file, or format it as ext4 or FAT (the confirmation defaults to
+Cancel). This is limited to what QEMU emulates for now; AHCI/NVMe drivers for real hardware are
+not enabled yet.
+
 ## CLI options
 
 - `init-buildroot.sh`: `--project`, `--projects`, `--skip-deps`, `--force`, `--non-interactive`,
@@ -76,7 +91,7 @@ keep `--no-qemu` so ISO generation does not try to open a display.
 - `examples/wayland/build.sh`: `--buildroot DIR` and `--triplet TARGET`.
 - `automate.sh`: `--binary FILE|NAME`, `--args STRING`, and `--cwd DIRECTORY`.
 - `make-iso.sh`: `--output FILE`, `--no-qemu` or `--qemu`, `--memory MB`, `--display BACKEND`,
-  and `--no-virgl`.
+  `--no-virgl`, `--disk FILE`, and `--disk-size MB`.
 
 ## Usage
 

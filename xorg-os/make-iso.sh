@@ -9,6 +9,8 @@ DISPLAY_BACKEND=gtk
 VIRGL=1
 DISK_FILE=
 DISK_SIZE_MB=512
+AUDIO_BACKEND=
+MUSIC_SRC=
 usage() {
     cat <<'EOF'
 Usage: bash make-iso.sh [options]
@@ -22,6 +24,10 @@ Options:
   --no-virgl          Disable virgl and OpenGL acceleration.
   --disk FILE         Attach FILE as a raw virtio disk in QEMU; it is created (sparse) when missing.
   --disk-size MB      Size used when --disk creates the file (default: 512).
+  --audio BACKEND     Add an Intel HDA sound card to QEMU using the host audio backend
+                      (pa, alsa, sdl, dsound, none, or "wav,path=out.wav"). Plays through aplay in the guest.
+  --music PATH        Embed an audio file (or every file in a directory) in the image under
+                      /mnt/music, where the linweb Music Player finds it without mounting a disk.
   -h, --help          Show this help.
 EOF
 }
@@ -35,6 +41,8 @@ while (($#)); do
         --no-virgl) VIRGL=0; shift ;;
         --disk) (($# >= 2)) || { echo "ERROR: --disk requires a path." >&2; exit 2; }; DISK_FILE=$2; shift 2 ;;
         --disk-size) (($# >= 2)) || { echo "ERROR: --disk-size requires a value." >&2; exit 2; }; DISK_SIZE_MB=$2; shift 2 ;;
+        --audio) (($# >= 2)) || { echo "ERROR: --audio requires a backend." >&2; exit 2; }; AUDIO_BACKEND=$2; shift 2 ;;
+        --music) (($# >= 2)) || { echo "ERROR: --music requires a path." >&2; exit 2; }; MUSIC_SRC=$2; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: unknown option: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -47,6 +55,14 @@ done
 command -v cpio >/dev/null || { echo "ERROR: cpio is required." >&2; exit 1; }
 command -v grub-mkrescue >/dev/null || { echo "ERROR: grub-mkrescue is required." >&2; exit 1; }
 command -v xorriso >/dev/null || { echo "ERROR: xorriso is required by grub-mkrescue. Install grub-pc-bin and xorriso." >&2; exit 1; }
+
+if [[ -n "$MUSIC_SRC" ]]; then
+    [[ -e "$MUSIC_SRC" ]] || { echo "ERROR: --music path not found: $MUSIC_SRC" >&2; exit 2; }
+    rm -rf output/target/mnt/music
+    mkdir -p output/target/mnt/music
+    if [[ -d "$MUSIC_SRC" ]]; then cp -a "$MUSIC_SRC"/. output/target/mnt/music/; else cp -a "$MUSIC_SRC" output/target/mnt/music/; fi
+    echo "Embedded in /mnt/music: $(ls output/target/mnt/music | wc -l) file(s)"
+fi
 
 mkdir -p output/iso/boot/grub
 (
@@ -73,6 +89,10 @@ if (( RUN_QEMU )); then
             echo "Created blank ${DISK_SIZE_MB} MB disk: $DISK_FILE"
         fi
         QEMU_ARGS+=(-drive "file=$DISK_FILE,format=raw,if=virtio")
+    fi
+    if [[ -n "$AUDIO_BACKEND" ]]; then
+        # -audiodev + intel-hda/hda-duplex also works on old QEMU (4.x), which lacks -audio
+        QEMU_ARGS+=(-audiodev "$AUDIO_BACKEND,id=snd0" -device intel-hda -device hda-duplex,audiodev=snd0)
     fi
     qemu-system-x86_64 "${QEMU_ARGS[@]}"
 fi

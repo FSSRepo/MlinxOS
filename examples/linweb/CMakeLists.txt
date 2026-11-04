@@ -22,6 +22,19 @@ endif()
 # Add QuickJS
 add_subdirectory(external/quickjs)
 
+# MP3 decoder (OpenMP3 plus a frame-by-frame wrapper); its headers use generic names
+# such as types.h, so they stay out of the global include path.
+add_library(linweb_mp3 STATIC
+    external/openmp3/huffman.cpp
+    external/openmp3/requantize.cpp
+    external/openmp3/stereo.cpp
+    external/openmp3/synthesis.cpp
+    external/openmp3/tables.cpp
+    src/media/mp3/decode.cpp
+    src/media/mp3/mp3_stream.cpp
+)
+target_include_directories(linweb_mp3 PRIVATE external/openmp3 src/media/mp3)
+
 # Collect all source files
 set(LINWEB_SOURCES
     src/main.cpp
@@ -70,7 +83,9 @@ set(LINWEB_SOURCES
     src/scripting/timer_bindings.cpp
     src/scripting/console_bindings.cpp
     src/scripting/storage_bindings.cpp
+    src/scripting/audio_bindings.cpp
     src/system/storage.cpp
+    src/system/audio.cpp
     src/utils/file_utils.cpp
     src/utils/dom_traversal.cpp
     src/utils/layout_traversal.cpp
@@ -129,6 +144,8 @@ target_compile_definitions(linweb PRIVATE
     CONFIG_VERSION="2021-03-27"
     _GNU_SOURCE
 )
+
+target_link_libraries(linweb PRIVATE linweb_mp3)
 
 # Math library for UNIX
 if(UNIX)

@@ -491,6 +491,10 @@ Result format_device(const std::string& dev_path, const std::string& fs,
     return run_mkfs(dev_path, fs, label);
 }
 
+Result resolve_existing(const std::string& path, std::string& resolved) {
+    return resolve_allowed(path, true, resolved);
+}
+
 Result list_dir(const std::string& path, std::vector<DirEntry>& out, bool& truncated) {
     out.clear();
     truncated = false;
@@ -630,6 +634,7 @@ Result unmount_path(const std::string&) { return unsupported(); }
 Result wipe_partition_tables(const std::string&) { return unsupported(); }
 Result run_mkfs(const std::string&, const std::string&, const std::string&) { return unsupported(); }
 Result format_device(const std::string&, const std::string&, const std::string&, const std::string&) { return unsupported(); }
+Result resolve_existing(const std::string&, std::string& resolved) { resolved.clear(); return unsupported(); }
 Result list_dir(const std::string&, std::vector<DirEntry>& out, bool& truncated) { out.clear(); truncated = false; return unsupported(); }
 Result read_file(const std::string&, size_t, std::string& out) { out.clear(); return unsupported(); }
 Result write_file(const std::string&, const std::string&) { return unsupported(); }

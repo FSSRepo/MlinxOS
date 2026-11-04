@@ -75,6 +75,9 @@ Result wipe_partition_tables(const std::string& target);
 Result run_mkfs(const std::string& target, const std::string& fs, const std::string& label);
 
 // File operations. Every path must resolve inside mount_root().
+// Resolve an existing path and check it stays inside mount_root() (no ".." or symlink escapes).
+Result resolve_existing(const std::string& path, std::string& resolved);
+
 Result list_dir(const std::string& path, std::vector<DirEntry>& out, bool& truncated);
 Result read_file(const std::string& path, size_t max_bytes, std::string& out);
 Result write_file(const std::string& path, const std::string& data);

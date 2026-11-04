@@ -183,7 +183,8 @@ header h1 {
 }
 
 /* Storage panel (disk list actions, file browser, confirmations) */
-#storage-panel {
+#storage-panel,
+#music-panel {
     display: none;
     position: absolute;
     right: 60px;
@@ -198,16 +199,19 @@ header h1 {
     z-index: 6;
 }
 
-#storage-panel.visible {
+#storage-panel.visible,
+#music-panel.visible {
     display: block;
 }
 
-#sp-title {
+#sp-title,
+#mp-title {
     font-size: 20px;
     margin-bottom: 6px;
 }
 
-#sp-subtitle {
+#sp-subtitle,
+#mp-subtitle {
     margin: 0 0 12px 0;
     color: rgba(255, 255, 255, 0.65);
     font: 13px/1.5 monospace;
@@ -230,7 +234,8 @@ header h1 {
     background: rgba(200, 60, 60, 0.7);
 }
 
-#sp-hint {
+#sp-hint,
+#mp-hint {
     margin-top: 12px;
     color: rgba(255, 255, 255, 0.5);
     font-size: 13px;

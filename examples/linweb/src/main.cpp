@@ -19,6 +19,8 @@
 #include "scripting/style_bindings.h"
 #include "scripting/console_bindings.h"
 #include "scripting/storage_bindings.h"
+#include "scripting/audio_bindings.h"
+#include "system/audio.h"
 #include "utils/file_utils.h"
 #include "utils/dom_traversal.h"
 #include "utils/layout_traversal.h"
@@ -61,6 +63,9 @@ void update_animations_on_tree(const std::shared_ptr<StyledNode>& node, const St
 }
 
 int main(int argc, char** argv) {
+    // MP3 playback runs in a child copy of this executable (see system/audio.cpp).
+    if (linweb::audio::is_helper_invocation(argc, argv)) return linweb::audio::helper_main(argc, argv);
+
     DebugType debug_mode = DebugType::None;
     std::string html_file = "assets/pages/index.html";
     bool file_specified = false;
@@ -241,6 +246,15 @@ int main(int argc, char** argv) {
     js.add_function("__storageWriteFile", js_storage_write_file);
     js.add_function("__storageMakeDir", js_storage_make_dir);
     js.add_function("__storageRemove", js_storage_remove);
+    js.add_function("__audioCards", js_audio_cards);
+    js.add_function("__audioGetVolume", js_audio_get_volume);
+    js.add_function("__audioSetVolume", js_audio_set_volume);
+    js.add_function("__audioSetMute", js_audio_set_mute);
+    js.add_function("__audioPlay", js_audio_play);
+    js.add_function("__audioStop", js_audio_stop);
+    js.add_function("__audioPause", js_audio_pause);
+    js.add_function("__audioResume", js_audio_resume);
+    js.add_function("__audioStatus", js_audio_status);
     js.add_function("__setStyleProperty", js_set_style_property);
     js.add_function("__setStylePropertyById", js_set_style_property_by_id);
     js.add_function("__setStylePropertyByAddr", js_set_style_property_by_addr);
@@ -284,6 +298,17 @@ int main(int argc, char** argv) {
         "    writeFile: (path, data) => __storageWriteFile(path, String(data)),"
         "    makeDir: (path) => __storageMakeDir(path),"
         "    remove: (path) => __storageRemove(path)"
+        "  },"
+        "  audio: {"
+        "    cards: () => __audioCards(),"
+        "    getVolume: (card) => __audioGetVolume(card || 0),"
+        "    setVolume: (card, percent) => __audioSetVolume(card || 0, percent),"
+        "    setMute: (card, muted) => __audioSetMute(card || 0, muted ? 1 : 0),"
+        "    play: (path, card, marginMs) => __audioPlay(path, card === undefined ? -1 : card, marginMs || 1000),"
+        "    stop: () => __audioStop(),"
+        "    pause: () => __audioPause(),"
+        "    resume: () => __audioResume(),"
+        "    status: () => __audioStatus()"
         "  }"
         "};"
         "const window = {"
@@ -313,9 +338,11 @@ int main(int argc, char** argv) {
         "    window._raf_callbacks = [];"
         "    callbacks.forEach(cb => cb());"
         "    const now = Date.now();"
-        "    window._timeouts = window._timeouts.filter(t => {"
-        "      if (now >= t.time) { t.cb(); return false; }"
-        "      return true;"
+        "    const pending = window._timeouts;"
+        "    window._timeouts = [];"
+        "    pending.forEach(t => {"
+        "      if (now >= t.time) t.cb();"
+        "      else window._timeouts.push(t);"
         "    });"
         "  }"
         "};"
@@ -532,5 +559,6 @@ int main(int argc, char** argv) {
         window.poll_events();
     }
 
+    linweb::audio::stop();
     return 0;
 }

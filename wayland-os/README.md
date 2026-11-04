@@ -67,6 +67,8 @@ To create the ISO and launch it on a graphical host, run `bash make-iso.sh --qem
 without OpenGL support, use `bash make-iso.sh --qemu --no-virgl`. For a headless build server,
 keep `--no-qemu` so ISO generation does not try to open a display.
 
+Audio: `bash make-iso.sh --qemu --audio pa` (or `alsa`, `sdl`, `dsound`...) adds an Intel HDA card (`-audiodev pa,id=snd0 -device intel-hda -device hda-duplex,audiodev=snd0`, which also works on QEMU 4.x). The guest kernel has `SND_HDA_INTEL`/`SND_HDA_GENERIC` (plus `SND_INTEL8X0` for `-device AC97` and `SND_VIRTIO` for `virtio-sound`), and the rootfs ships `alsa-utils`. Check it inside the guest with `cat /proc/asound/cards`, `amixer sset Master 80% unmute` and `speaker-test -c2 -t sine -l1`; `--audio "wav,path=out.wav"` records what the guest plays when the host has no sound. `--music FILE_OR_DIR` embeds audio files in the image under `/mnt/music` so the Music Player finds them without mounting a disk (they make the initramfs, and the ISO, larger by their size).
+
 ### Disks in QEMU
 
 The kernel supports virtio, SCSI and IDE disks, MBR/GPT partitions, ext4 and FAT, and the image

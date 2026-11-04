@@ -36,6 +36,15 @@ document.addEventListener('DOMContentLoaded', function() {
         onItemsChanged: () => { loadSubMenu('Storage', true); }
     }) : null;
 
+    const musicUI = (typeof createMusicUI === 'function') ? createMusicUI({
+        panel: document.getElementById('music-panel'),
+        title: document.getElementById('mp-title'),
+        subtitle: document.getElementById('mp-subtitle'),
+        list: document.getElementById('mp-list'),
+        hint: document.getElementById('mp-hint'),
+        setStatus: (text) => { statusElement.innerText = text; }
+    }) : null;
+
     function currentCategory() {
         return menuItems[currentIndex].getAttribute('data-name');
     }
@@ -123,6 +132,10 @@ document.addEventListener('DOMContentLoaded', function() {
             storageUI.handleKey(e);
             return;
         }
+        if (musicUI && musicUI.isOpen()) {
+            musicUI.handleKey(e);
+            return;
+        }
 
         if (e.keyCode === 37) { // Left
             if (subMenuIndex === -1) {
@@ -175,6 +188,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     systemInfoPanel.classList.add('visible');
                     statusElement.innerText = selected;
                     if (selected === 'Renderer Debug') linweb.debug.renderer();
+                } else if (selected === 'Music Player' && musicUI) {
+                    systemInfoPanel.classList.remove('visible');
+                    musicUI.open();
                 } else {
                     systemInfoPanel.classList.remove('visible');
                     statusElement.innerText = `Running ${selected}...`;

@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const glErrors = selected === 'Renderer Debug' ? linweb.debug.glErrors() : [];
                     systemInfoPanel.innerText = [
                         'MLinxOS system information',
-                        'Session: X.Org / EGL / OpenGL',
+                        `Session: ${gpu.session || 'unknown'}`,
                         `GPU vendor: ${gpu.vendor}`,
                         `Renderer: ${gpu.renderer}`,
                         `OpenGL: ${gpu.version}`,

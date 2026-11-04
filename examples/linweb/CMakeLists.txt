@@ -14,8 +14,10 @@ if(NOT WESTON_PLATFORM AND NOT XORG_PLATFORM)
     find_package(glfw3 CONFIG REQUIRED)
 endif()
 
-# Find OpenGL
-find_package(OpenGL REQUIRED)
+# Find OpenGL (the Weston build uses GLESv2/EGL instead)
+if(NOT WESTON_PLATFORM)
+    find_package(OpenGL REQUIRED)
+endif()
 
 # Add QuickJS
 add_subdirectory(external/quickjs)

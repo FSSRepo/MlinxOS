@@ -3,11 +3,17 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 BUILDROOT_DIR=${1:-${BUILDROOT_DIR:-"$SCRIPT_DIR/../../../wayland-os"}}
-BUILD_DIR=${BUILD_DIR:-"$SCRIPT_DIR/build-xorg"}
+PLATFORM=${PLATFORM:-xorg}
+case "$PLATFORM" in
+    xorg) XORG_ON=ON; WESTON_ON=OFF ;;
+    weston) XORG_ON=OFF; WESTON_ON=ON ;;
+    *) echo "ERROR: PLATFORM must be xorg or weston, got: $PLATFORM" >&2; exit 2 ;;
+esac
+BUILD_DIR=${BUILD_DIR:-"$SCRIPT_DIR/build-$PLATFORM"}
 
 if [[ ! -f "$BUILDROOT_DIR/output/host/share/buildroot/toolchainfile.cmake" ]]; then
     echo "ERROR: Buildroot toolchain not found at $BUILDROOT_DIR" >&2
-    echo "Usage: bash build.sh [BUILDROOT_DIR]" >&2
+    echo "Usage: [PLATFORM=xorg|weston] bash build.sh [BUILDROOT_DIR]" >&2
     exit 1
 fi
 
@@ -25,7 +31,7 @@ fi
     -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
     -DCMAKE_TOOLCHAIN_FILE="$BUILDROOT_DIR/output/host/share/buildroot/toolchainfile.cmake" \
     -DCMAKE_FIND_ROOT_PATH="$BUILDROOT_DIR/output/staging" \
-    -DCMAKE_BUILD_TYPE=Release -DXORG_PLATFORM=ON -DWESTON_PLATFORM=OFF
+    -DCMAKE_BUILD_TYPE=Release -DXORG_PLATFORM=$XORG_ON -DWESTON_PLATFORM=$WESTON_ON
 "$CMAKE" --build "$BUILD_DIR" --parallel "$(nproc)"
 
 install -D -m 0755 "$BUILD_DIR/linweb" "$BUILDROOT_DIR/output/target/usr/bin/linweb"

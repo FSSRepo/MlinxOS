@@ -1,5 +1,6 @@
 #include "scripting/console_bindings.h"
 #include "gl_wrapper.h"
+#include "platform/platform_config.h"
 #include <cctype>
 #include <cstdio>
 #include <iostream>
@@ -14,6 +15,14 @@ static JSValue gl_string(JSContext* ctx, GLenum name) {
 
 JSValue js_gl_renderer_info(JSContext* ctx, JSValueConst, int, JSValueConst*) {
     JSValue info = JS_NewObject(ctx);
+#if defined(LINWEB_PLATFORM_WESTON)
+    const char* session = "Wayland / Weston / EGL";
+#elif defined(LINWEB_PLATFORM_XORG)
+    const char* session = "X.Org / EGL / OpenGL";
+#else
+    const char* session = "GLFW / OpenGL";
+#endif
+    JS_SetPropertyStr(ctx, info, "session", JS_NewString(ctx, session));
     JS_SetPropertyStr(ctx, info, "vendor", gl_string(ctx, GL_VENDOR));
     JS_SetPropertyStr(ctx, info, "renderer", gl_string(ctx, GL_RENDERER));
     JS_SetPropertyStr(ctx, info, "version", gl_string(ctx, GL_VERSION));

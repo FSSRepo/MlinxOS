@@ -11,6 +11,9 @@ DISK_FILE=
 DISK_SIZE_MB=512
 AUDIO_BACKEND=
 MUSIC_SRC=
+VIDEO_SRC=
+KEYBOARD=
+NET=1
 usage() {
     cat <<'EOF'
 Usage: bash make-iso.sh [options]
@@ -28,6 +31,12 @@ Options:
                       (pa, alsa, sdl, dsound, none, or "wav,path=out.wav"). Plays through aplay in the guest.
   --music PATH        Embed an audio file (or every file in a directory) in the image under
                       /mnt/music, where the linweb Music Player finds it without mounting a disk.
+  --video PATH        Embed a video file (or every file in a directory) under /mnt/video, where the linweb
+                      Video Player finds it. MP4 with H.264 and AAC; 640x360 keeps the image small.
+  --keyboard LAYOUT   Keyboard layout, as LAYOUT or LAYOUT,VARIANT (for example us, es, latam,
+                      es,dvorak). Passed on the kernel command line; the default is us.
+  --no-net            Do not add a network card to QEMU (by default a virtio NIC with user-mode NAT,
+                      which the guest configures by DHCP: 10.0.2.15, internet through the host).
   -h, --help          Show this help.
 EOF
 }
@@ -43,6 +52,9 @@ while (($#)); do
         --disk-size) (($# >= 2)) || { echo "ERROR: --disk-size requires a value." >&2; exit 2; }; DISK_SIZE_MB=$2; shift 2 ;;
         --audio) (($# >= 2)) || { echo "ERROR: --audio requires a backend." >&2; exit 2; }; AUDIO_BACKEND=$2; shift 2 ;;
         --music) (($# >= 2)) || { echo "ERROR: --music requires a path." >&2; exit 2; }; MUSIC_SRC=$2; shift 2 ;;
+        --video) (($# >= 2)) || { echo "ERROR: --video requires a path." >&2; exit 2; }; VIDEO_SRC=$2; shift 2 ;;
+        --keyboard) (($# >= 2)) || { echo "ERROR: --keyboard requires a layout." >&2; exit 2; }; KEYBOARD=$2; shift 2 ;;
+        --no-net) NET=0; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "ERROR: unknown option: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -63,12 +75,28 @@ if [[ -n "$MUSIC_SRC" ]]; then
     if [[ -d "$MUSIC_SRC" ]]; then cp -a "$MUSIC_SRC"/. output/target/mnt/music/; else cp -a "$MUSIC_SRC" output/target/mnt/music/; fi
     echo "Embedded in /mnt/music: $(ls output/target/mnt/music | wc -l) file(s)"
 fi
+if [[ -n "$VIDEO_SRC" ]]; then
+    [[ -e "$VIDEO_SRC" ]] || { echo "ERROR: --video path not found: $VIDEO_SRC" >&2; exit 2; }
+    rm -rf output/target/mnt/video
+    mkdir -p output/target/mnt/video
+    if [[ -d "$VIDEO_SRC" ]]; then cp -a "$VIDEO_SRC"/. output/target/mnt/video/; else cp -a "$VIDEO_SRC" output/target/mnt/video/; fi
+    echo "Embedded in /mnt/video: $(ls output/target/mnt/video | wc -l) file(s)"
+fi
 
-mkdir -p output/iso/boot/grub
-(
-    cd output/target
-    find . -print0 | cpio --quiet --null -o --format=newc | gzip -9
-) > output/iso/boot/initramfs.img
+mkdir -p output/iso/boot/grub output/iso/live
+cp output/images/live-initrd.gz output/iso/boot/initramfs.img
+# The whole system is one compressed file on the medium, read at run time (not copied to RAM).
+output/host/bin/mksquashfs output/target output/iso/live/rootfs.squashfs -comp xz -noappend -all-root -quiet
+
+if [[ -n "$KEYBOARD" ]]; then
+    [[ "$KEYBOARD" =~ ^[A-Za-z0-9_-]+(,[A-Za-z0-9_-]+)?$ ]] || { echo "ERROR: invalid --keyboard value: $KEYBOARD" >&2; exit 2; }
+    KB_LAYOUT=${KEYBOARD%%,*}
+    KB_VARIANT=
+    [[ "$KEYBOARD" == *,* ]] && KB_VARIANT=${KEYBOARD#*,}
+    sed -i -e 's/ xkb_layout=[^ ]*//g' -e 's/ xkb_variant=[^ ]*//g' output/iso/boot/grub/grub.cfg
+    sed -i "s#rdinit=/init#rdinit=/init xkb_layout=$KB_LAYOUT${KB_VARIANT:+ xkb_variant=$KB_VARIANT}#" output/iso/boot/grub/grub.cfg
+    echo "Keyboard layout: $KB_LAYOUT${KB_VARIANT:+ ($KB_VARIANT)}"
+fi
 
 # BIOS-only El Torito image (no EFI/GPT/APM/HFS+), like the reference ISO.
 GRUB_PC_DIR=${GRUB_PC_DIR:-/usr/lib/grub/i386-pc}
@@ -93,6 +121,10 @@ if (( RUN_QEMU )); then
     if [[ -n "$AUDIO_BACKEND" ]]; then
         # -audiodev + intel-hda/hda-duplex also works on old QEMU (4.x), which lacks -audio
         QEMU_ARGS+=(-audiodev "$AUDIO_BACKEND,id=snd0" -device intel-hda -device hda-duplex,audiodev=snd0)
+    fi
+    if (( NET )); then
+        # the guest kernel has virtio-net (and 8139cp), not QEMU's default e1000
+        QEMU_ARGS+=(-netdev user,id=net0 -device virtio-net-pci,netdev=net0)
     fi
     qemu-system-x86_64 "${QEMU_ARGS[@]}"
 fi

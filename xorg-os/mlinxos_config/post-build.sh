@@ -20,3 +20,6 @@ if [ -f "${MODESETTING}" ] && [ -x "${PATCHELF}" ]; then
 	"${PATCHELF}" --print-needed "${MODESETTING}" | grep -qx 'libgbm.so.1' || \
 	    "${PATCHELF}" --add-needed libgbm.so.1 "${MODESETTING}"
 fi
+
+# Live initramfs: finds the medium and mounts live/rootfs.squashfs with an overlay on top.
+sh mlinxos_config/make-live-initrd.sh "${TARGET_DIR}" "${BINARIES_DIR}/live-initrd.gz"

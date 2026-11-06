@@ -29,7 +29,7 @@ fi
 make -j"$JOBS"
 
 [[ -f output/images/bzImage ]] || { echo "ERROR: output/images/bzImage not found. Kernel compilation failed." >&2; exit 1; }
-[[ -f output/images/rootfs.cpio.gz ]] || { echo "ERROR: output/images/rootfs.cpio.gz not found. Initramfs generation failed." >&2; exit 1; }
+[[ -f output/images/live-initrd.gz ]] || { echo "ERROR: output/images/live-initrd.gz not found. Live initramfs generation failed." >&2; exit 1; }
 [[ -d output/target ]] || { echo "ERROR: output/target not found. Rootfs was not generated." >&2; exit 1; }
 
 mkdir -p output/iso/boot/grub output/target/etc/init.d
@@ -44,6 +44,60 @@ rm -f output/target/usr/lib/pkgconfig/wayland*.pc
 rm -rf output/target/usr/lib/weston output/target/usr/share/weston
 rm -rf output/target/usr/share/libweston-* output/target/usr/share/wayland-sessions
 rm -rf output/target/usr/share/wayland
+cat <<'EOF' > output/target/etc/init.d/S39keyboard
+#!/bin/sh
+# Keyboard layout for Xorg from the kernel command line: xkb_layout=es [xkb_variant=...]
+case "$1" in
+    start)
+        LAYOUT=; VARIANT=
+        for arg in $(cat /proc/cmdline); do
+            case "$arg" in
+                xkb_layout=*) LAYOUT=${arg#xkb_layout=} ;;
+                xkb_variant=*) VARIANT=${arg#xkb_variant=} ;;
+            esac
+        done
+        [ -n "$LAYOUT" ] || exit 0
+        mkdir -p /etc/X11/xorg.conf.d
+        {
+            echo 'Section "InputClass"'
+            echo '    Identifier "keyboard-layout"'
+            echo '    MatchIsKeyboard "on"'
+            echo '    Option "XkbLayout" "'"$LAYOUT"'"'
+            [ -n "$VARIANT" ] && echo '    Option "XkbVariant" "'"$VARIANT"'"'
+            echo 'EndSection'
+        } > /etc/X11/xorg.conf.d/10-keyboard.conf
+        ;;
+    stop) ;;
+    *) echo "Usage: $0 {start|stop}"; exit 1 ;;
+esac
+EOF
+chmod +x output/target/etc/init.d/S39keyboard
+
+cat <<'EOF' > output/target/etc/init.d/S41ethernet
+#!/bin/sh
+# Loopback and DHCP on wired interfaces (QEMU's virtio NIC, or a cable); Wi-Fi is handled by linweb.
+case "$1" in
+    start)
+        ip link set lo up 2>/dev/null
+        for dev in /sys/class/net/*; do
+            name=${dev##*/}
+            [ "$name" = lo ] && continue
+            if [ -d "$dev/wireless" ] || [ -d "$dev/phy80211" ]; then continue; fi
+            ip link set "$name" up 2>/dev/null
+            udhcpc -b -i "$name" -p "/var/run/udhcpc.$name.pid" -t 5 -T 2 >/dev/null 2>&1 &
+        done
+        ;;
+    stop)
+        for pidfile in /var/run/udhcpc.*.pid; do
+            [ -f "$pidfile" ] && kill "$(cat "$pidfile")" 2>/dev/null
+        done
+        ;;
+    *) echo "Usage: $0 {start|stop}"; exit 1 ;;
+esac
+EOF
+chmod +x output/target/etc/init.d/S41ethernet
+
+
 cat <<'EOF' > output/iso/boot/grub/grub.cfg
 set timeout=0
 set default=0

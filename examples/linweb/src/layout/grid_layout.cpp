@@ -9,6 +9,23 @@
 namespace linweb
 {
 
+    namespace {
+        // One track size: negative for fr units (-1 for 1fr), pixels otherwise. A minmax(min, max) track takes its max.
+        // Never throws: a value that is not a number is treated as 0 (or 1fr for a bare "fr").
+        float parse_track(const std::string& part, float container) {
+            std::string value = part;
+            if (value.compare(0, 7, "minmax(") == 0) {
+                size_t comma = value.find(',');
+                value = value.substr(comma == std::string::npos ? 7 : comma + 1);
+                if (!value.empty() && value.back() == ')') value.pop_back();
+            }
+            if (value.size() >= 2 && value.compare(value.size() - 2, 2, "fr") == 0) {
+                try { return -std::stof(value.substr(0, value.size() - 2)); } catch (...) { return -1.0f; }
+            }
+            return LayoutEngine::parse_px(value, container);
+        }
+    }
+
     /**
      * @brief Resolves the column widths for the grid layout (Grid).
      *
@@ -35,15 +52,7 @@ namespace linweb
             std::string part;
             while (ss >> part)
             {
-                if (part == "fr" || part == "1fr")
-                    col_widths.push_back(-1.0f);
-                else if (part.find("fr") != std::string::npos)
-                {
-                    float fr = std::stof(part.substr(0, part.find("fr")));
-                    col_widths.push_back(-fr);
-                }
-                else
-                    col_widths.push_back(LayoutEngine::parse_px(part, container_width));
+                col_widths.push_back(parse_track(part, container_width));
             }
         }
 
@@ -85,15 +94,7 @@ namespace linweb
             std::string part;
             while (ss >> part)
             {
-                if (part == "fr" || part == "1fr")
-                    row_heights.push_back(-1.0f);
-                else if (part.find("fr") != std::string::npos)
-                {
-                    float fr = std::stof(part.substr(0, part.find("fr")));
-                    row_heights.push_back(-fr);
-                }
-                else
-                    row_heights.push_back(LayoutEngine::parse_px(part, container_height));
+                row_heights.push_back(parse_track(part, container_height));
             }
         }
 
@@ -153,6 +154,8 @@ namespace linweb
             c_start = c_end = r_start = r_end = -1;
             std::string area = child->styled_node->value("grid-area");
             if (!area.empty()) {
+                // "row-start / col-start / row-end / col-end": a slash separates the lines like a space does
+                std::replace(area.begin(), area.end(), '/', ' ');
                 std::stringstream ss(area);
                 std::string rs, cs, re, ce;
                 ss >> rs >> cs >> re >> ce;
@@ -292,6 +295,23 @@ namespace linweb
             for (int c = p.c_start; c < p.c_end; ++c)
                 w += col_widths[c - 1];
             w += column_gap * (p.c_end - p.c_start - 1);
+            // justify-items / justify-self: center gives an item without a width its content's width, centered in its cell
+            std::string justify = child->styled_node->value("justify-self");
+            if (justify.empty() || justify == "auto") justify = styled_node->value("justify-items");
+            std::string own_width = child->styled_node->value("width");
+            if (justify == "center" && (own_width.empty() || own_width == "auto")) {
+                float content_w = 0;
+                for (const auto& grandchild : child->children) {
+                    if (grandchild->position == PositionType::Absolute || grandchild->position == PositionType::Fixed) continue;
+                    float outer = grandchild->dimensions.content.width + grandchild->dimensions.padding.left + grandchild->dimensions.padding.right +
+                                  grandchild->dimensions.border.left + grandchild->dimensions.border.right;
+                    content_w += outer;   // inline-level items sit side by side in the item's line
+                }
+                if (content_w > 0 && content_w < w) {
+                    x += (w - content_w) / 2.0f;
+                    w = content_w;
+                }
+            }
             float h = child_natural_heights[i];
             if (p.r_end > p.r_start && p.r_end - 1 <= num_rows) {
                 h = 0;
@@ -299,10 +319,31 @@ namespace linweb
                 h += row_gap * (p.r_end - p.r_start - 1);
             }
 
+            // vertical placement inside the cell: margin-top:auto pushes the item to the bottom, align-items:center
+            // centers it (an item's own size is what is left once its margins are taken out)
+            float item_height = child->dimensions.content.height;
+            float cell_height = 0;
+            for (int r = p.r_start; r < p.r_end && r > 0 && static_cast<size_t>(r) <= row_heights.size(); ++r)
+                cell_height += row_heights[r - 1];
+            cell_height = std::min(cell_height, dimensions.content.height);   // a row cannot be taller than its grid
+            std::string own_align = child->styled_node->value("align-self");
+            if (own_align.empty() || own_align == "auto") own_align = styled_node->value("align-items");
+            if (child->styled_node->value("margin-top") == "auto") y += std::max(0.0f, cell_height - item_height);
+            else if (own_align == "center") y += std::max(0.0f, (cell_height - item_height) / 2.0f);
+
             child->dimensions.content.x = x;
             child->dimensions.content.y = y;
             child->dimensions.content.width = std::max(0.0f, w);
             child->dimensions.content.height = std::max(0.0f, h);
+
+            // the item moved, so its children are placed again from its new position (its size is the cell's)
+            Dimensions item_container;
+            item_container.content.x = x - child->dimensions.margin.left - child->dimensions.padding.left - child->dimensions.border.left;
+            item_container.content.y = y - child->dimensions.margin.top - child->dimensions.padding.top - child->dimensions.border.top;
+            item_container.content.width = child->dimensions.content.width;
+            item_container.content.height = child->dimensions.content.height;
+            child->layout_children(item_container);
+            child->center_button_content();
         }
 
         total_height = 0;

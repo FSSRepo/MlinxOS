@@ -4,6 +4,8 @@
 
 namespace linweb {
 
+struct CustomFont;
+
 enum class GradientType {
     None,
     Linear,
@@ -18,7 +20,7 @@ struct Gradient {
     float r4 = 0, g4 = 0, b4 = 0, a4 = 0;
     float s1 = 0.0f, s2 = 1.0f, s3 = 0.0f, s4 = 0.0f;
     int color_count = 2;
-    float angle = 0; // For linear: degrees. For radial: not used yet.
+    float angle = 180; // CSS linear gradients default to top-to-bottom.
 };
 
 struct BoxShadow {
@@ -51,20 +53,24 @@ public:
     static void set_viewport(int width, int height);
     static int get_viewport_width();
     static int get_viewport_height();
-    static float measure_text(const std::string& text, float font_size = 16.0f, bool is_bold = false, bool is_monospace = false);
-    static float get_line_height(float font_size = 16.0f);
+    // custom selects a loaded @font-face face; it replaces the bold and monospace choice when given
+    static float measure_text(const std::string& text, float font_size = 16.0f, bool is_bold = false, bool is_monospace = false, const CustomFont* custom = nullptr);
+    static float font_ascent(const CustomFont* custom = nullptr);
+    static float get_line_height(float font_size = 16.0f, const CustomFont* custom = nullptr);
+    static float scaled_ascent(float font_size, const CustomFont* custom = nullptr);
     static void render(const std::shared_ptr<LayoutBox>& root);
     static void set_debug_mode(DebugType type);
     static void set_debug_box(const std::shared_ptr<LayoutBox>& box);
-    static void draw_rect(float x, float y, float width, float height, float r, float g, float b, float a, float radius = 0.0f, float blur = 0.0f, float invert = 0.0f, const Gradient& gradient = Gradient(), float border_width = 0.0f);
+    static void draw_rect(float x, float y, float width, float height, float r, float g, float b, float a, float radius = 0.0f, float blur = 0.0f, float invert = 0.0f, const Gradient& gradient = Gradient(), float border_width = 0.0f, bool is_shadow = false);
     static void draw_image(GLuint texture_id, float x, float y, float width, float height, float radius = 0.0f,
                            float shadow_r = 0.0f, float shadow_g = 0.0f, float shadow_b = 0.0f, float shadow_a = 0.0f,
                            float shadow_offset_x = 0.0f, float shadow_offset_y = 0.0f, float shadow_blur = 0.0f,
-                           int tex_width = 0, int tex_height = 0);
-    static void draw_text(const std::string& text, float x, float y, float font_size = 16.0f, float r = 0.0f, float g = 0.0f, float b = 0.0f, float a = 1.0f, bool is_bold = false, float blur = 0.0f, float invert = 0.0f, bool is_monospace = false, float line_height = 0.0f);
+                           int tex_width = 0, int tex_height = 0, float opacity = 1.0f);
+    static void draw_text(const std::string& text, float x, float y, float font_size = 16.0f, float r = 0.0f, float g = 0.0f, float b = 0.0f, float a = 1.0f, bool is_bold = false, float blur = 0.0f, float invert = 0.0f, bool is_monospace = false, const CustomFont* custom = nullptr);
 
 private:
     static void render_box(const std::shared_ptr<LayoutBox>& box, float inherited_opacity = 1.0f, const Filter& inherited_filter = Filter());
+    static void draw_ps3_background(float x, float y, float width, float height);
 
     static DebugType debug_type;
     static std::shared_ptr<LayoutBox> debug_box;

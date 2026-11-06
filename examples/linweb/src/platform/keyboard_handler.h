@@ -1,6 +1,7 @@
 #pragma once
 #include "input_handler.h"
 #include "keys.h"
+#include "key_event.h"
 #include <string>
 
 namespace linweb {
@@ -17,10 +18,12 @@ public:
     void update() override;
 
     void handle_key(Window* window, Key key, int scancode, Action action, int mods);
+    void handle_key_event(Window* window, const KeyEvent& event);
 
     void set_js_engine(JSEngine* js_engine) { js_engine_ = js_engine; }
 
     static void key_callback(Window* window, Key key, int scancode, Action action, int mods);
+    static void key_event_callback(Window* window, const KeyEvent& event);
 
 private:
     JSEngine* js_engine_;

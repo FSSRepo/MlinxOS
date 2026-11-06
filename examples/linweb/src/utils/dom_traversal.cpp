@@ -87,6 +87,7 @@ std::shared_ptr<Node> find_shared_ptr_by_addr(Node* ptr) {
     
     std::function<std::shared_ptr<Node>(std::shared_ptr<Node>)> find_in_tree;
     find_in_tree = [&](std::shared_ptr<Node> n) -> std::shared_ptr<Node> {
+        if (!n) return nullptr;
         if (n.get() == ptr) return n;
         for (auto& c : n->children) {
             auto found = find_in_tree(c);

@@ -1,69 +1,76 @@
+#include <cmath>
 #include "renderer/text_renderer.h"
 #include "renderer/renderer_internal.h"
-#include <algorithm>
+#include "renderer/custom_font.h"
+#include "utils/text_encoding.h"
 
 namespace linweb {
 
-float Renderer::measure_text(const std::string& text, float font_size, bool is_bold, bool is_monospace) {
+// The baked glyphs of the face a text run uses: a loaded @font-face face, or one of the built-in faces
+static const stbtt_bakedchar* glyphs_of(bool is_bold, bool is_monospace, const CustomFont* custom) {
+    if (custom) return custom->glyphs;
+    if (is_monospace) return RendererState::cdata_mono;
+    return is_bold ? RendererState::cdata_bold : RendererState::cdata;
+}
+
+static GLuint texture_of(bool is_bold, bool is_monospace, const CustomFont* custom) {
+    if (custom) return custom->texture;
+    if (is_monospace) return RendererState::ftex_mono;
+    return is_bold ? RendererState::ftex_bold : RendererState::ftex;
+}
+
+float Renderer::measure_text(const std::string& text, float font_size, bool is_bold, bool is_monospace, const CustomFont* custom) {
     float xpos = 0;
-    float max_width = 0;
     float scale = font_size / RendererState::base_font_size;
-    for (size_t i = 0; i < text.size(); ++i) {
-        char c = text[i];
-        if (c == '\r' || c == '\n') {
-            max_width = std::max(max_width, xpos);
-            xpos = 0;
-            if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
-                ++i;
-            continue;
-        }
-        if (c < 32 || c >= 128) continue;
-        stbtt_bakedchar *b;
-        if (is_monospace)
-            b = &RendererState::cdata_mono[c - 32];
-        else if (is_bold)
-            b = &RendererState::cdata_bold[c - 32];
-        else
-            b = &RendererState::cdata[c - 32];
+    const stbtt_bakedchar* glyphs = glyphs_of(is_bold, is_monospace, custom);
+    for (size_t pos = 0; pos < text.size();) {
+        uint32_t c = next_codepoint(text, pos);
+        if (c < 32) continue;
+        if (c > 255) c = '?';
+        const stbtt_bakedchar *b = &glyphs[c - 32];
         xpos += b->xadvance * scale;
     }
-    return std::max(max_width, xpos);
+    return xpos;
 }
 
-float Renderer::get_line_height(float font_size) {
-    return RendererState::font_line_height_px * (font_size / RendererState::base_font_size);
+float Renderer::font_ascent(const CustomFont* custom) {
+    return custom ? custom->ascent_px : RendererState::font_ascent_px;
 }
 
-void Renderer::draw_text(const std::string& text, float x, float y, float font_size, float r, float g, float b, float a, bool is_bold, float blur, float invert, bool is_monospace, float line_height) {
+float Renderer::get_line_height(float font_size, const CustomFont* custom) {
+    const float scale = font_size / RendererState::base_font_size;
+    const float descent = custom ? custom->descent_px : RendererState::font_descent_px;
+    const float gap = custom ? custom->gap_px : RendererState::font_gap_px;
+    const float ascent = Renderer::font_ascent(custom);
+    if (ascent <= 0.0f) return (custom ? custom->line_height_px : RendererState::font_line_height_px) * scale;
+    return std::round(ascent * scale) + std::round(descent * scale) + std::round(gap * scale);
+}
+
+// Where the baseline is below the top of a line of text at this size: the rounded ascent, and half of the rounded gap
+float Renderer::scaled_ascent(float font_size, const CustomFont* custom) {
+    const float scale = font_size / RendererState::base_font_size;
+    const float gap = custom ? custom->gap_px : RendererState::font_gap_px;
+    return std::round(Renderer::font_ascent(custom) * scale) + std::round(gap * scale) / 2.0f;
+}
+
+void Renderer::draw_text(const std::string& text, float x, float y, float font_size, float r, float g, float b, float a, bool is_bold, float blur, float invert, bool is_monospace, const CustomFont* custom) {
     if (!RendererState::program_text || RendererState::vbo_text == 0) return;
-    if (!is_monospace && RendererState::ftex == 0) return;
-    if (is_monospace && RendererState::ftex_mono == 0) return;
+    if (!custom && !is_monospace && RendererState::ftex == 0) return;
+    if (!custom && is_monospace && RendererState::ftex_mono == 0) return;
+    const stbtt_bakedchar* glyphs = glyphs_of(is_bold, is_monospace, custom);
 
     float xpos = x;
     float ypos = y;
     float scale = font_size / RendererState::base_font_size;
-    float line_advance = line_height > 0.0f ? line_height : get_line_height(font_size);
 
     std::vector<float> verts;
     verts.reserve(text.size() * 6 * 8);
 
-    for (size_t i = 0; i < text.size(); ++i) {
-        char c = text[i];
-        if (c == '\r' || c == '\n') {
-            xpos = x;
-            ypos += line_advance;
-            if (c == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
-                ++i;
-            continue;
-        }
-        if (c < 32 || c >= 128) continue;
-        stbtt_bakedchar *bc;
-        if (is_monospace)
-            bc = &RendererState::cdata_mono[c - 32];
-        else if (is_bold)
-            bc = &RendererState::cdata_bold[c - 32];
-        else
-            bc = &RendererState::cdata[c - 32];
+    for (size_t pos = 0; pos < text.size();) {
+        uint32_t c = next_codepoint(text, pos);
+        if (c < 32) continue;
+        if (c > 255) c = '?';
+        const stbtt_bakedchar* bc = &glyphs[c - 32];
         
         float x0 = xpos + bc->xoff * scale;
         float y0 = ypos + bc->yoff * scale;
@@ -74,6 +81,15 @@ void Renderer::draw_text(const std::string& text, float x, float y, float font_s
         float t0 = bc->y0 / 1024.0f;
         float s1 = bc->x1 / 1024.0f;
         float t1 = bc->y1 / 1024.0f;
+
+        // A blurred glyph (text-shadow) spreads past its own box: the quad grows by the blur radius, which the
+        // fragment shader spans as blur * 0.0015 of the 1024 px atlas, so the spread is blur * 1.536 atlas pixels.
+        if (blur > 0.1f) {
+            float pad_px = blur * 1.6f * scale;
+            float pad_uv = blur * 1.6f / 1024.0f;
+            x0 -= pad_px; y0 -= pad_px; x1 += pad_px; y1 += pad_px;
+            s0 -= pad_uv; t0 -= pad_uv; s1 += pad_uv; t1 += pad_uv;
+        }
 
         float v[] = {
             x0, y0, s0, t0, r, g, b, a,
@@ -92,14 +108,7 @@ void Renderer::draw_text(const std::string& text, float x, float y, float font_s
     if (verts.empty()) return;
 
     glActiveTexture(GL_TEXTURE0);
-    GLuint tex_id;
-    if (is_monospace)
-        tex_id = RendererState::ftex_mono;
-    else if (is_bold)
-        tex_id = RendererState::ftex_bold;
-    else
-        tex_id = RendererState::ftex;
-    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glBindTexture(GL_TEXTURE_2D, texture_of(is_bold, is_monospace, custom));
     glUseProgram(RendererState::program_text);
     glUniformMatrix4fv(RendererState::program_text_u_model, 1, GL_FALSE, RendererState::current_model.data());
     glUniform1f(RendererState::program_text_u_blur, blur);

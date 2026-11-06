@@ -46,6 +46,19 @@ float calculate_max_scroll(const std::shared_ptr<LayoutBox>& box, float visible_
     return std::max(0.0f, box->total_content_height - effective_visible_height);
 }
 
+float max_scroll_of(const std::shared_ptr<LayoutBox>& box, float viewport_height) {
+    if (!box) return 0.0f;
+
+    // The root box is clipped to the viewport; any other scroll container is clipped to its padding box.
+    bool is_root = box->parent.expired();
+    float visible_height = box->dimensions.content.height + box->dimensions.padding.top + box->dimensions.padding.bottom;
+    if (is_root && viewport_height > 0.0f) visible_height = viewport_height;
+
+    // The border box is what the renderer and the wheel handler take away from the content height.
+    float scrollable_height = box->total_content_height - box->dimensions.border.top - box->dimensions.border.bottom;
+    return std::max(0.0f, scrollable_height - visible_height);
+}
+
 void clamp_scroll(std::shared_ptr<LayoutBox> box, float max_scroll) {
     if (!box) return;
     if (box->scroll_y < 0) box->scroll_y = 0;

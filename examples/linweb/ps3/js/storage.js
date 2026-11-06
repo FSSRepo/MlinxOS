@@ -76,53 +76,82 @@ function createStorageUI(options) {
         items = [];
         const disks = listDisks();
         if (disks === null) {
-            items.push({ label: 'Storage unavailable', kind: 'none' });
+            items.push({ label: 'Storage unavailable', kind: 'none', icon: 'alert' });
             return;
         }
         disks.forEach(disk => {
-            items.push({ label: disk.name + '   ' + fmtSize(disk.sizeBytes) + (disk.mounted ? '   [mounted]' : ''), kind: 'device', path: disk.path });
+            items.push({ label: disk.name + '   ' + fmtSize(disk.sizeBytes), kind: 'device', path: disk.path, icon: 'database' });
             disk.partitions.forEach(part => {
-                items.push({ label: '- ' + part.name + '   ' + fmtSize(part.sizeBytes) + (part.mounted ? '   [mounted]' : ''), kind: 'device', path: part.path });
+                items.push({ label: part.name + '   ' + fmtSize(part.sizeBytes), kind: 'device', path: part.path, icon: 'partition' });
             });
         });
-        if (!disks.length) items.push({ label: 'No disks detected', kind: 'none' });
-        items.push({ label: 'Refresh', kind: 'refresh' });
+        if (!disks.length) items.push({ label: 'No disks detected', kind: 'none', icon: 'alert' });
+        items.push({ label: 'Refresh', kind: 'refresh', icon: 'refresh' });
     }
 
     function labels() {
         return items.map(item => item.label);
     }
 
+    function rows() {
+        return items.map(item => ({ label: item.label, icon: item.icon }));
+    }
+
     // ---- rendering --------------------------------------------------------
     function showRows(rows, index, dangerIndex) {
-        ui.list.innerHTML = '';
         const start = Math.min(Math.max(0, index - 3), Math.max(0, rows.length - PANEL_ROWS));
         const end = Math.min(rows.length, start + PANEL_ROWS);
+        const cells = xmbListRows(ui.list, end - start);
         for (let i = start; i < end; i++) {
-            const row = document.createElement('div');
+            const entry = rows[i];
+            const label = (entry && typeof entry === 'object') ? entry.label : entry;
+            const icon = (entry && typeof entry === 'object') ? entry.icon : undefined;
+            const meta = (entry && typeof entry === 'object') ? entry.meta : undefined;
+            const row = cells[i - start];
             row.className = 'sp-item' + (i === index ? ' active' : '') + (i === dangerIndex ? ' danger' : '');
-            row.innerText = rows[i];
-            ui.list.appendChild(row);
+            if (typeof xmbFillItem === 'function') xmbFillItem(row, label, icon, meta);
+            else row.innerText = label;
         }
     }
 
     function draw(title, subtitle, rows, index, hint, dangerIndex) {
-        ui.panel.classList.add('visible');
+        // A disk takes the whole screen; progress stays in the column
+        const full = state.mode !== 'busy';
+        const wasVisible = ui.panel.classList.contains('visible') && !ui.panel.classList.contains('fade-out');
+        ui.panel.classList.toggle('fullscreen', full);
+        xmbSetPanel(ui.panel, true);
+        // Opening fades the panel in (it does not grow); moving between screens is handled by the slides
+        if (!wasVisible) restartFade(ui.panel, 'fade-in');
         ui.title.innerText = title;
         ui.subtitle.innerText = subtitle;
         showRows(rows, index, dangerIndex === undefined ? -1 : dangerIndex);
         ui.hint.innerText = hint;
+        xmbRevealSelection(ui.panel);
+    }
+
+    // Going deeper (actions, files, file view) slides the list in from the right; going back slides it in from the left.
+    // Confirmations and progress sit on top of everything, so they come in from the right too.
+    const LEVEL = { actions: 1, browser: 2, viewer: 3, confirm: 4, busy: 4 };
+    function slideBetweenLevels() {
+        const level = LEVEL[state.mode] || 0;
+        const last = state.level || 0;
+        if (level && last && level !== last) {
+            if (level > last) xmbSlideForward(ui.list);
+            else xmbSlideBack(ui.list);
+        }
+        state.level = level;
     }
 
     function render() {
         const ctx = state.ctx;
+        slideBetweenLevels();
         if (state.mode === 'actions') {
             draw((ctx.isDisk ? 'Disk ' : 'Partition ') + ctx.dev.name, describe(ctx),
                 state.actions.map(a => a.label), state.index, 'Up/Down: select   Enter: run   Esc: close');
         } else if (state.mode === 'browser') {
             const rows = browserRows();
             const sub = state.text || (state.entries.length + ' item(s)' + (state.truncated ? ' (list truncated)' : ''));
-            draw('Files: ' + state.path, sub, rows.map(r => r.label), state.index,
+            draw('Files: ' + state.path, sub, rows, state.index,
                 'Up/Down: select   Enter: open   Esc: back   ' + (state.index + 1) + '/' + rows.length);
         } else if (state.mode === 'viewer') {
             const text = state.lines.slice(state.offset, state.offset + VIEW_LINES).join('\n');
@@ -134,17 +163,13 @@ function createStorageUI(options) {
                 (ctx.isDisk && ctx.dev.partitions.length ? '\nThe ' + ctx.dev.partitions.length + ' partition(s) of this disk will be lost.' : '');
             draw('Format ' + ctx.dev.name, warn, ['Cancel', 'Erase everything'], state.index,
                 'Left/Right: choose   Enter: confirm   Esc: cancel', 1);
-        } else if (state.mode === 'message') {
-            draw(state.title, state.text, ['OK'], 0, 'Enter: continue');
         } else if (state.mode === 'busy') {
             draw(state.title, state.text, [], -1, '');
         }
     }
 
     function close() {
-        state.mode = null;
-        state.ctx = null;
-        ui.panel.classList.remove('visible');
+        fadeOutAndClose();
         ui.setStatus('STORAGE');
     }
 
@@ -177,22 +202,13 @@ function createStorageUI(options) {
         render();
     }
 
-    function showMessage(title, text, after) {
-        state.mode = 'message';
-        state.title = title;
-        state.text = text;
-        state.after = after;
-        render();
-    }
-
-    // Refresh the device list, then show a message that returns to the device actions.
+    // Refresh the device list, show the result as a toast and return to the device actions.
     function finish(title, text, devPath) {
         ui.onItemsChanged();
-        showMessage(title, text, () => {
-            const ctx = findDevice(devPath);
-            if (ctx) showActions(ctx);
-            else close();
-        });
+        xmbToast(title, text);
+        const ctx = findDevice(devPath);
+        if (ctx) showActions(ctx, true);
+        else close();
     }
 
     function mount(ctx) {
@@ -247,12 +263,20 @@ function createStorageUI(options) {
 
     function browserRows() {
         const rows = [];
-        if (state.path !== state.root) rows.push({ label: '..', up: true });
+        if (state.path !== state.root) rows.push({ label: 'Parent folder', up: true, icon: 'up' });
         state.entries.forEach(entry => {
+            let icon = 'file';
+            if (entry.dir) icon = 'folder';
+            else if (typeof xmbIconName === 'function') {
+                const guessed = xmbIconName(entry.name);
+                if (guessed !== 'chevron') icon = guessed;
+            }
             rows.push({
-                label: entry.dir ? '[DIR] ' + entry.name : entry.name + '   (' + fmtSize(entry.size) + ')',
+                label: entry.name,
                 name: entry.name,
-                dir: entry.dir
+                dir: entry.dir,
+                icon: icon,
+                meta: entry.dir ? '' : fmtSize(entry.size)
             });
         });
         return rows;
@@ -268,6 +292,37 @@ function createStorageUI(options) {
         state.text = result.ok ? '' : result.error;
         state.index = restoreIndex || 0;
         render();
+    }
+
+    // Where the browser is now: a player that was opened from here calls this to come back to the same folder and row
+    function resumeFrom() {
+        const here = { ctx: state.ctx, root: state.root, path: state.path, index: state.index };
+        return () => {
+            state.ctx = here.ctx;
+            showBrowser(here.path, here.root, here.index);
+            restartFade(ui.panel, 'fade-in');
+        };
+    }
+
+    function restartFade(panel, name) {
+        panel.classList.remove('fade-in', 'fade-out');
+        void panel.offsetWidth;
+        panel.classList.add(name);
+    }
+
+    // The browser leaves with a fade out while the player fades in over it
+    const FADE_MS = 300;
+    function fadeOutAndClose() {
+        state.mode = null;
+        state.level = 0;
+        state.ctx = null;
+        restartFade(ui.panel, 'fade-out');
+        setTimeout(() => {
+            // a panel opened again during the fade keeps its place
+            if (!ui.panel.classList.contains('fade-out')) return;
+            ui.panel.classList.remove('fade-out', 'fullscreen');
+            xmbSetPanel(ui.panel, false);
+        }, FADE_MS);
     }
 
     function showViewer(path, name) {
@@ -305,14 +360,16 @@ function createStorageUI(options) {
             else if (down) move(1, rows.length);
             else if (enter && rows.length) {
                 const row = rows[state.index];
-                if (row.up) showBrowser(parentPath(state.path));
-                else if (row.dir) showBrowser(joinPath(state.path, row.name));
-                else {
+                if (row.up) { showBrowser(parentPath(state.path)); xmbSlideBack(ui.list); }
+                else if (row.dir) { showBrowser(joinPath(state.path, row.name)); xmbSlideForward(ui.list); }
+                else if (ui.openMedia && ui.openMedia(joinPath(state.path, row.name), resumeFrom())) {
+                    fadeOutAndClose();                    // the music or video player fades in over it
+                } else {
                     state.browserIndex = state.index;
                     showViewer(joinPath(state.path, row.name), row.name);
                 }
             } else if (back) {
-                if (state.path !== state.root) showBrowser(parentPath(state.path));
+                if (state.path !== state.root) { showBrowser(parentPath(state.path)); xmbSlideBack(ui.list); }
                 else showActions(findDevice(state.ctx.dev.path) || state.ctx);
             }
         } else if (state.mode === 'viewer') {
@@ -326,8 +383,6 @@ function createStorageUI(options) {
                 if (state.index === 1) runFormat();
                 else showActions(state.ctx);
             } else if (back) showActions(state.ctx);
-        } else if (state.mode === 'message') {
-            if (enter || back) state.after();
         }
         // 'busy' ignores input until the blocking operation ends.
     }
@@ -352,6 +407,7 @@ function createStorageUI(options) {
     return {
         buildItems: buildItems,
         labels: labels,
+        rows: rows,
         activate: activate,
         handleKey: handleKey,
         isOpen: () => state.mode !== null

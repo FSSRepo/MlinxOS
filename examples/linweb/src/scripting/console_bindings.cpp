@@ -1,4 +1,5 @@
 #include "scripting/console_bindings.h"
+#include "scripting/js_engine.h"
 #include "gl_wrapper.h"
 #include "platform/platform_config.h"
 #include <cctype>
@@ -85,6 +86,19 @@ JSValue js_console_warn(JSContext* ctx, JSValueConst this_val, int argc, JSValue
     }
     std::cout << std::endl;
     return JS_UNDEFINED;
+}
+
+void install_console_bindings(JSEngine& js)
+{
+    js.add_function("print", js_console_log);
+    js.execute(R"JS(
+const console = {
+  log: (...args) => print(...args),
+  error: (...args) => print('ERROR:', ...args),
+  warn: (...args) => print('WARN:', ...args),
+  info: (...args) => print('INFO:', ...args)
+};
+)JS");
 }
 
 } // namespace linweb

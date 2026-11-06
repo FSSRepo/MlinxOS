@@ -14,9 +14,9 @@ namespace linweb {
     unsigned char RendererState::font_buffer[1 << 20];
     unsigned char RendererState::font_bold_buffer[1 << 20];
     unsigned char RendererState::font_mono_buffer[1 << 20];
-    stbtt_bakedchar RendererState::cdata[96];
-    stbtt_bakedchar RendererState::cdata_bold[96];
-    stbtt_bakedchar RendererState::cdata_mono[96];
+    stbtt_bakedchar RendererState::cdata[224];
+    stbtt_bakedchar RendererState::cdata_bold[224];
+    stbtt_bakedchar RendererState::cdata_mono[224];
     GLuint RendererState::ftex = 0;
     GLuint RendererState::ftex_bold = 0;
     GLuint RendererState::ftex_mono = 0;
@@ -26,6 +26,8 @@ namespace linweb {
     float RendererState::base_font_size = 64.0f;
     float RendererState::font_ascent_px = 18.0f;
     float RendererState::font_line_height_px = 24.0f;
+    float RendererState::font_descent_px = 6.0f;
+    float RendererState::font_gap_px = 0.0f;
     int RendererState::viewport_width = 1;
     int RendererState::viewport_height = 1;
     std::array<float, 16> RendererState::proj{};
@@ -41,6 +43,7 @@ namespace linweb {
     GLint RendererState::program_color_u_size = -1;
     GLint RendererState::program_color_u_radius = -1;
     GLint RendererState::program_color_u_blur = -1;
+    GLint RendererState::program_color_u_shadow = -1;
     GLint RendererState::program_color_u_invert = -1;
     GLint RendererState::program_color_u_grad_type = -1;
     GLint RendererState::program_color_u_grad_c1 = -1;
@@ -81,6 +84,13 @@ namespace linweb {
     GLint RendererState::program_image_a_pos = -1;
     GLint RendererState::program_image_a_uv = -1;
 
+    GLuint RendererState::program_bg = 0;
+    GLint RendererState::program_bg_u_proj = -1;
+    GLint RendererState::program_bg_u_model = -1;
+    GLint RendererState::program_bg_u_time = -1;
+    GLint RendererState::program_bg_a_pos = -1;
+    GLint RendererState::program_bg_a_uv = -1;
+
     void RendererState::update_proj()
     {
         float l = 0.0f;
@@ -116,6 +126,7 @@ namespace linweb {
             RendererState::program_color_u_size = glGetUniformLocation(RendererState::program_color, "uSize");
             RendererState::program_color_u_radius = glGetUniformLocation(RendererState::program_color, "uRadius");
             RendererState::program_color_u_blur = glGetUniformLocation(RendererState::program_color, "uBlur");
+            RendererState::program_color_u_shadow = glGetUniformLocation(RendererState::program_color, "uShadow");
             RendererState::program_color_u_invert = glGetUniformLocation(RendererState::program_color, "uInvert");
             RendererState::program_color_u_grad_type = glGetUniformLocation(RendererState::program_color, "uGradType");
             RendererState::program_color_u_grad_c1 = glGetUniformLocation(RendererState::program_color, "uGradC1");
@@ -180,6 +191,23 @@ namespace linweb {
         if (fs_image)
             glDeleteShader(fs_image);
 
+        GLuint vs_bg = compile_shader(GL_VERTEX_SHADER, vs_image_src);
+        GLuint fs_bg = compile_shader(GL_FRAGMENT_SHADER, fs_xmb_src);
+        if (vs_bg && fs_bg)
+            RendererState::program_bg = link_program(vs_bg, fs_bg);
+        if (RendererState::program_bg)
+        {
+            RendererState::program_bg_u_proj = glGetUniformLocation(RendererState::program_bg, "uProj");
+            RendererState::program_bg_u_model = glGetUniformLocation(RendererState::program_bg, "uModel");
+            RendererState::program_bg_u_time = glGetUniformLocation(RendererState::program_bg, "uTime");
+            RendererState::program_bg_a_pos = glGetAttribLocation(RendererState::program_bg, "aPos");
+            RendererState::program_bg_a_uv = glGetAttribLocation(RendererState::program_bg, "aUV");
+        }
+        if (vs_bg)
+            glDeleteShader(vs_bg);
+        if (fs_bg)
+            glDeleteShader(fs_bg);
+
         glGenBuffers(1, &RendererState::vbo_color);
         glGenBuffers(1, &RendererState::vbo_text);
 
@@ -215,6 +243,11 @@ namespace linweb {
             glUniformMatrix4fv(RendererState::program_image_u_proj, 1, GL_FALSE, RendererState::proj.data());
             if (RendererState::program_image_u_tex >= 0)
                 glUniform1i(RendererState::program_image_u_tex, 0);
+        }
+        if (RendererState::program_bg && RendererState::program_bg_u_proj >= 0)
+        {
+            glUseProgram(RendererState::program_bg);
+            glUniformMatrix4fv(RendererState::program_bg_u_proj, 1, GL_FALSE, RendererState::proj.data());
         }
         glUseProgram(0);
     }

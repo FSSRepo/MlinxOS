@@ -23,6 +23,7 @@ enum class Key {
     LeftAlt = 50,
     RightAlt = 51,
     F2 = 52,
+    F3 = 53,
 };
 
 enum class Action {

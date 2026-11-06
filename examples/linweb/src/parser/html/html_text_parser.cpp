@@ -1,6 +1,7 @@
 #include "parser/html/html_text_parser.h"
 #include <cctype>
 #include <algorithm>
+#include "utils/text_encoding.h"
 
 namespace linweb {
 
@@ -9,7 +10,7 @@ bool is_raw_text_element(const std::string& tag_name) {
 }
 
 std::shared_ptr<Node> parse_text(HTMLTokenizer& t) {
-    std::string text = t.consume_while([](char c) { return c != '<'; });
+    std::string text = decode_html_entities(t.consume_while([](char c) { return c != '<'; }));
     
     if (text.empty()) return nullptr;
 
@@ -30,8 +31,6 @@ std::shared_ptr<Node> parse_text(HTMLTokenizer& t) {
         }
     }
 
-    if (result.length() == 1 && (result == " " || result == "\n")) return nullptr;
-    
     return std::make_shared<TextNode>(result);
 }
 

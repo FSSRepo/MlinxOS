@@ -14,11 +14,13 @@ enum class Combinator {
 };
 
 struct SimpleSelector {
+    struct Attribute { std::string name, op, value; bool insensitive = false; };
     std::string tag_name;
     std::string id;
     std::vector<std::string> classes;
     std::vector<std::string> pseudo_classes;
     std::string pseudo_element;
+    std::vector<Attribute> attributes;
 };
 
 struct Selector {

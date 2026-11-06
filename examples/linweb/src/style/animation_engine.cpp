@@ -9,8 +9,132 @@ namespace linweb {
 
 std::vector<AnimDebugEntry> g_anim_debug_entries;
 
+namespace {
+
+// A time in the animation shorthand: a number with a unit, so a bare number stays an iteration count.
+bool is_time_token(const std::string& token) {
+    if (token.size() < 2) return false;
+    if (token.compare(token.size() - 2, 2, "ms") == 0) return true;
+    const char first = token[0];
+    return token.back() == 's' &&
+           (std::isdigit(static_cast<unsigned char>(first)) || first == '.' || first == '-' || first == '+');
+}
+
+bool is_number_token(const std::string& token) {
+    if (token.empty()) return false;
+    const char first = token[0];
+    return std::isdigit(static_cast<unsigned char>(first)) || first == '.' || first == '-' || first == '+';
+}
+
+bool is_timing_function(const std::string& token) {
+    return token == "ease" || token == "ease-in" || token == "ease-out" || token == "ease-in-out" ||
+           token == "linear" || token.compare(0, 13, "cubic-bezier(") == 0 || token.compare(0, 6, "steps(") == 0;
+}
+
+bool is_fill_mode(const std::string& token) {
+    return token == "none" || token == "forwards" || token == "backwards" || token == "both";
+}
+
+// Seconds, from a CSS time ("0.15s" or "150ms").
+float parse_time_token(const std::string& token) {
+    try {
+        if (token.size() >= 2 && token.compare(token.size() - 2, 2, "ms") == 0)
+            return std::stof(token.substr(0, token.size() - 2)) / 1000.0f;
+        return std::stof(token);
+    } catch (...) {
+        return 0.0f;
+    }
+}
+
+// The first value of a comma separated list: the longhands can name several animations.
+std::string first_list_value(const PropertyMap& specified, const std::string& name) {
+    auto it = specified.find(name);
+    if (it == specified.end()) return "";
+    std::string value = trim(it->second);
+    size_t comma = value.find(',');
+    if (comma != std::string::npos) value = trim(value.substr(0, comma));
+    return value;
+}
+
+struct AnimationParams {
+    std::string name;
+    float duration = 0.0f;
+    float delay = 0.0f;
+    std::string timing_function = "ease";
+    std::string iteration_count = "1";
+    std::string fill_mode = "none";
+};
+
+// The shorthand is name, then times, timing, iteration count and fill mode in any order. The first time is the
+// duration and the second one the delay; the longhand properties override what the shorthand said.
+AnimationParams parse_animation_params(const std::string& shorthand, const PropertyMap& specified) {
+    AnimationParams params;
+    std::stringstream ss(shorthand);
+    std::vector<std::string> tokens;
+    for (std::string token; ss >> token;) tokens.push_back(token);
+    if (tokens.empty()) return params;
+    params.name = tokens[0];
+
+    int time_slot = 0;
+    for (size_t i = 1; i < tokens.size(); ++i) {
+        const std::string& token = tokens[i];
+        if (is_time_token(token)) {
+            if (time_slot == 0) {
+                params.duration = parse_time_token(token);
+                time_slot = 1;
+            } else if (time_slot == 1) {
+                params.delay = parse_time_token(token);
+                time_slot = 2;
+            }
+        } else if (is_timing_function(token)) {
+            params.timing_function = token;
+        } else if (token == "infinite" || is_number_token(token)) {
+            params.iteration_count = token;
+        } else if (is_fill_mode(token)) {
+            params.fill_mode = token;
+        }
+        // direction and play-state are not animated by this engine
+    }
+
+    std::string longhand = first_list_value(specified, "animation-duration");
+    if (!longhand.empty() && is_time_token(longhand)) params.duration = parse_time_token(longhand);
+    longhand = first_list_value(specified, "animation-delay");
+    if (!longhand.empty() && is_time_token(longhand)) params.delay = parse_time_token(longhand);
+    longhand = first_list_value(specified, "animation-timing-function");
+    if (!longhand.empty()) params.timing_function = longhand;
+    longhand = first_list_value(specified, "animation-iteration-count");
+    if (!longhand.empty()) params.iteration_count = longhand;
+    longhand = first_list_value(specified, "animation-fill-mode");
+    if (!longhand.empty()) params.fill_mode = longhand;
+    return params;
+}
+
+void push_debug_entry(const AnimationState& as, const std::shared_ptr<StyledNode>& styled_node,
+                      double elapsed, float raw_t, float eased_t,
+                      const std::map<std::string, AnimPropDebugInfo>& animated_props) {
+    AnimDebugEntry entry;
+    if (styled_node->node) {
+        entry.node_tag = styled_node->node->tag_name;
+        if (styled_node->node->is_element()) {
+            auto el = std::static_pointer_cast<ElementNode>(styled_node->node);
+            if (el->data.attributes.count("id")) entry.node_id = el->data.attributes.at("id");
+        }
+    }
+    entry.anim_name = as.name;
+    entry.elapsed = elapsed;
+    entry.t = raw_t;
+    entry.eased_t = eased_t;
+    entry.timing_function = as.timing_function;
+    entry.animated_props = animated_props;
+    g_anim_debug_entries.push_back(entry);
+}
+
+} // namespace
+
 float AnimationEngine::calculate_animation_progress(const AnimationState& as, double current_time, bool& finished, double* out_elapsed, float* out_raw_t) {
-    double elapsed = current_time - as.start_time;
+    // The delay runs before the animation: the progress clock starts counting once it has passed.
+    double elapsed = current_time - as.start_time - as.delay;
+    if (elapsed < 0.0) elapsed = 0.0;
     finished = false;
     float t = 0.0f;
 
@@ -20,6 +144,7 @@ float AnimationEngine::calculate_animation_progress(const AnimationState& as, do
         } else {
             int max_iters = 1;
             try { max_iters = std::stoi(as.iteration_count); } catch(...) {}
+            if (max_iters < 1) max_iters = 1;
             float total_dur = as.duration * max_iters;
             if (elapsed >= total_dur) {
                 t = 1.0f;
@@ -30,7 +155,7 @@ float AnimationEngine::calculate_animation_progress(const AnimationState& as, do
         }
     } else {
         t = 1.0f;
-        finished = true;
+        finished = (current_time - as.start_time) >= as.delay;
     }
 
     if (out_elapsed) *out_elapsed = elapsed;
@@ -147,6 +272,18 @@ std::map<std::string, AnimPropDebugInfo> AnimationEngine::get_keyframe_styles(
             std::string out = oss.str();
             if (out.empty()) out = "none";
             result[prop] = {val1, val2, out};
+        } else if (prop == "translate") {
+            auto offsets = [](const std::string& v, float& x, float& y) {
+                std::stringstream words(v);
+                std::string a, b;
+                words >> a >> b;
+                x = (a.empty() || a == "none") ? 0.0f : parse_px(a);
+                y = b.empty() ? 0.0f : parse_px(b);
+            };
+            float x1, y1, x2, y2;
+            offsets(val1, x1, y1);
+            offsets(val2, x2, y2);
+            result[prop] = {val1, val2, std::to_string(lerp(x1, x2, k_t)) + "px " + std::to_string(lerp(y1, y2, k_t)) + "px"};
         } else if (prop == "filter") {
             if (val1.find("blur(") == 0 && val2.find("blur(") == 0) {
                 float b1 = parse_px(val1.substr(5, val1.size() - 6));
@@ -225,27 +362,26 @@ bool AnimationEngine::update_animation(
     double elapsed = 0.0;
     float raw_t = 0.0f;
     float eased_t = calculate_animation_progress(as, current_time, finished, &elapsed, &raw_t);
-    
+
+    // Before the delay the animation does not advance. With a backwards (or both) fill the first keyframe is
+    // shown during the wait; otherwise the element keeps its normal style.
+    const bool in_delay = (current_time - as.start_time) < as.delay;
+    const bool fills_backwards = as.fill_mode == "backwards" || as.fill_mode == "both";
+    if (in_delay && !fills_backwards) {
+        auto animated_props = get_keyframe_styles(as, stylesheet, 0.0f, styled_node->specified_values);
+        for (const auto& [prop, val] : animated_props) styled_node->animated_values.erase(prop);
+        push_debug_entry(as, styled_node, elapsed, raw_t, eased_t, animated_props);
+        return false;
+    }
+
     auto animated_props = get_keyframe_styles(as, stylesheet, eased_t, styled_node->specified_values);
     for (const auto& [prop, val] : animated_props) {
         styled_node->animated_values[prop] = val.actual;
+        if (prop != "opacity" && prop != "filter" && prop != "text-shadow" && prop != "color" && prop != "background-color" && prop != "transform" && prop != "translate")
+            as.layout_affecting = true;
     }
 
-    AnimDebugEntry entry;
-    if (styled_node->node) {
-        entry.node_tag = styled_node->node->tag_name;
-        if (styled_node->node->is_element()) {
-            auto el = std::static_pointer_cast<ElementNode>(styled_node->node);
-            if (el->data.attributes.count("id")) entry.node_id = el->data.attributes.at("id");
-        }
-    }
-    entry.anim_name = as.name;
-    entry.elapsed = elapsed;
-    entry.t = raw_t;
-    entry.eased_t = eased_t;
-    entry.timing_function = as.timing_function;
-    entry.animated_props = animated_props;
-    g_anim_debug_entries.push_back(entry);
+    push_debug_entry(as, styled_node, elapsed, raw_t, eased_t, animated_props);
     
     return finished;
 }
@@ -280,56 +416,30 @@ void AnimationEngine::apply_animations(
     }
 
     if (!current_anim_name.empty() && current_anim_name != "none") {
-        std::stringstream ss(specified["animation"]);
-        std::vector<std::string> tokens;
-        std::string token;
-        while (ss >> token) {
-            tokens.push_back(token);
-        }
-
-        if (tokens.empty()) return;
-
-        std::string name = tokens[0];
-        std::string dur_str;
-        std::string timing_func = "ease";
-        std::string iter_count = "1";
-
-        size_t idx = 1;
-
-        if (idx < tokens.size()) {
-            const std::string& t = tokens[idx];
-            if (!t.empty() && (std::isdigit(static_cast<unsigned char>(t[0])) || t[0] == '.')) {
-                dur_str = t;
-                idx++;
-            }
-        }
-
-        for (; idx < tokens.size(); idx++) {
-            const std::string& t = tokens[idx];
-            if (t == "ease" || t == "ease-in" || t == "ease-out" || t == "ease-in-out" ||
-                t == "linear" || t.find("cubic-bezier(") == 0 || t.find("steps(") == 0) {
-                timing_func = t;
-            } else if (t == "infinite" || (!t.empty() && (std::isdigit(static_cast<unsigned char>(t[0])) || t[0] == '.'))) {
-                iter_count = t;
-            }
-        }
-
-        float duration = 0.0f;
-        if (!dur_str.empty()) {
-            if (dur_str.find("ms") != std::string::npos) duration = std::stof(dur_str) / 1000.0f;
-            else duration = std::stof(dur_str);
-        }
+        const AnimationParams params = parse_animation_params(specified["animation"], specified);
 
         auto& node_anims = g_active_animations[node_ptr];
-        if (!node_anims.count(name)) {
+        auto anim_it = node_anims.find(params.name);
+        if (anim_it == node_anims.end()) {
             AnimationState as;
-            as.name = name;
+            as.name = params.name;
             as.start_time = current_time;
-            as.duration = duration;
-            as.timing_function = timing_func;
-            as.iteration_count = iter_count;
+            as.duration = params.duration;
+            as.delay = params.delay;
+            as.timing_function = params.timing_function;
+            as.iteration_count = params.iteration_count;
+            as.fill_mode = params.fill_mode;
             as.finished = false;
-            node_anims[name] = as;
+            node_anims[params.name] = as;
+        } else {
+            // The longhands (style.animationDelay, ...) can change while the animation runs. The start time stays,
+            // so a new delay only shifts the phase of the running animation.
+            AnimationState& as = anim_it->second;
+            as.duration = params.duration;
+            as.delay = params.delay;
+            as.timing_function = params.timing_function;
+            as.iteration_count = params.iteration_count;
+            as.fill_mode = params.fill_mode;
         }
     }
 

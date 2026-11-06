@@ -1,5 +1,6 @@
 #include "gl_wrapper.h"
 #include <iostream>
+#include <thread>
 #include <chrono>
 #include <iomanip>
 #include <map>
@@ -12,14 +13,18 @@
 #include "parser/css/css_parser.h"
 #include "style/style_engine.h"
 #include "style/animation_engine.h"
+#include "style/transform_parser.h"
+#include "style/transition_engine.h"
 #include "layout/layout_engine.h"
+#include "system/perf.h"
 #include "renderer/renderer.h"
+#include "renderer/custom_font.h"
+#include "app/app_state.h"
+#include "app/js_api.h"
 #include "scripting/js_engine.h"
-#include "scripting/dom_bindings.h"
-#include "scripting/style_bindings.h"
-#include "scripting/console_bindings.h"
-#include "scripting/storage_bindings.h"
-#include "scripting/audio_bindings.h"
+#include "media/video/video_player.h"
+#include "system/network.h"
+#include "system/nodelite.h"
 #include "system/audio.h"
 #include "utils/file_utils.h"
 #include "utils/dom_traversal.h"
@@ -27,36 +32,30 @@
 #include "utils/scroll_manager.h"
 #include "platform/window.h"
 #include "platform/keyboard_handler.h"
+#include "platform/gamepad_input.h"
+#include "forms/form_bindings.h"
+#include "forms/form_controls.h"
 #include "platform/scroll_handler.h"
 #include "platform/mouse_handler.h"
 #include "debug/debug_visualizer.h"
 #include "debug/node_tree_view.h"
 
-namespace linweb {
-
-// Global state
-std::shared_ptr<Node> g_dom_root;
-std::shared_ptr<StyledNode> g_style_tree;
-std::shared_ptr<LayoutBox> g_layout_tree;
-std::shared_ptr<StyledNode> g_hovered_node;
-std::shared_ptr<Node> g_focused_node;
-std::shared_ptr<Node> g_active_node;
-std::map<std::shared_ptr<Node>, float> g_scroll_states;
-std::vector<std::shared_ptr<Node>> g_detached_nodes;
-bool g_dom_dirty = false;
-bool g_show_node_tree = false;
-bool g_debug_mode_active = false;
-std::shared_ptr<Node> g_debug_hovered_node = nullptr;
-JSEngine* g_js_engine = nullptr;
-float g_scroll_speed = 40.0f;
-
-} // namespace linweb
-
 using namespace linweb;
 
 void update_animations_on_tree(const std::shared_ptr<StyledNode>& node, const StyleSheet& stylesheet, double current_time, float w, float h) {
     if (!node) return;
-    StyleEngine::build_style_tree(node->node, stylesheet, g_hovered_node ? g_hovered_node->node : nullptr, g_focused_node, g_active_node, current_time, w, h);
+    TransitionEngine::apply_transitions(node, current_time, w, h);
+    AnimationEngine::apply_animations(node, stylesheet, current_time);
+    // the transform comes from the (possibly animated) value, as in build_style_tree
+    const std::string transform_str = node->value("transform");
+    if (!transform_str.empty()) {
+        node->transform = TransformParser::parse_transform(transform_str);
+        const std::string origin_str = node->value("transform-origin");
+        if (!origin_str.empty()) TransformParser::parse_transform_origin(origin_str, node->transform);
+    }
+    // `translate` is re-read each frame; the transform it adds to starts again from the transform property
+    if (!node->value("translate").empty() && transform_str.empty()) node->transform = Transform();
+    TransformParser::apply_translate_property(node->value("translate"), node->transform);
     for (const auto& child : node->children) {
         update_animations_on_tree(child, stylesheet, current_time, w, h);
     }
@@ -144,6 +143,21 @@ int main(int argc, char** argv) {
                 img->data.attributes["src"] = resolve_resource_path(html_base_dir, img->data.attributes["src"]);
             }
         }
+
+        // <video src="..." autoplay loop>: the first video element that asks for it starts playing
+        std::vector<std::shared_ptr<ElementNode>> videos;
+        find_tags(dom, "video", videos);
+        bool autoplay_started = false;
+        for (auto& element : videos) {
+            if (!element->data.attributes.count("src")) continue;
+            element->data.attributes["src"] = resolve_resource_path(html_base_dir, element->data.attributes["src"]);
+            if (!autoplay_started && element->data.attributes.count("autoplay")) {
+                autoplay_started = true;
+                linweb::video::Result started = linweb::video::play(element->data.attributes["src"], -1,
+                                                                    element->data.attributes.count("loop") > 0);
+                if (!started.ok) std::cerr << "video: " << started.error << std::endl;
+            }
+        }
     }
 
     // 6. Load Resources (CSS)
@@ -177,6 +191,10 @@ int main(int argc, char** argv) {
     auto stylesheet = CSSParser::parse(css);
     auto css_end = std::chrono::high_resolution_clock::now();
 
+    for (const auto& face : stylesheet.font_faces) {
+        if (!face.family.empty() && !face.source.empty()) CustomFonts::add(face.family, face.weight, face.style == "italic" || face.style == "oblique", face.source);
+    }
+
     // 7. Setup viewport
     int fbw = 0, fbh = 0;
     window.get_framebuffer_size(fbw, fbh);
@@ -184,6 +202,8 @@ int main(int argc, char** argv) {
 
     Dimensions viewport;
     viewport.content = {0, 0, static_cast<float>(fbw), static_cast<float>(fbh)};
+    g_viewport_width = viewport.content.width;
+    g_viewport_height = viewport.content.height;
 
     // 8. Style & Layout
     auto style_start = std::chrono::high_resolution_clock::now();
@@ -234,253 +254,155 @@ int main(int argc, char** argv) {
     g_js_engine = &js;
     keyboard_handler.set_js_engine(g_js_engine);
 
-    js.add_function("print", js_console_log);
-    js.add_function("__glRendererInfo", js_gl_renderer_info);
-    js.add_function("__glDrainErrors", js_gl_drain_errors);
-    js.add_function("__storageList", js_storage_list);
-    js.add_function("__storageMount", js_storage_mount);
-    js.add_function("__storageUnmount", js_storage_unmount);
-    js.add_function("__storageFormat", js_storage_format);
-    js.add_function("__storageListDir", js_storage_list_dir);
-    js.add_function("__storageReadFile", js_storage_read_file);
-    js.add_function("__storageWriteFile", js_storage_write_file);
-    js.add_function("__storageMakeDir", js_storage_make_dir);
-    js.add_function("__storageRemove", js_storage_remove);
-    js.add_function("__audioCards", js_audio_cards);
-    js.add_function("__audioGetVolume", js_audio_get_volume);
-    js.add_function("__audioSetVolume", js_audio_set_volume);
-    js.add_function("__audioSetMute", js_audio_set_mute);
-    js.add_function("__audioPlay", js_audio_play);
-    js.add_function("__audioStop", js_audio_stop);
-    js.add_function("__audioPause", js_audio_pause);
-    js.add_function("__audioResume", js_audio_resume);
-    js.add_function("__audioStatus", js_audio_status);
-    js.add_function("__setStyleProperty", js_set_style_property);
-    js.add_function("__setStylePropertyById", js_set_style_property_by_id);
-    js.add_function("__setStylePropertyByAddr", js_set_style_property_by_addr);
-    js.add_function("__querySelectorAll", js_query_selector_all);
-    js.add_function("__getElementById", js_get_element_by_id);
-    js.add_function("__createElement", js_create_element);
-    js.add_function("__appendChild", js_append_child);
-    js.add_function("__setTextContent", js_set_text_content);
-    js.add_function("__getTextContent", js_get_text_content);
-    js.add_function("__setInnerHTML", js_set_inner_html);
-    js.add_function("__getInnerHTML", js_get_inner_html);
-    js.add_function("__getClassName", js_get_class_name);
-    js.add_function("__setClassName", js_set_class_name);
-    js.add_function("__addClassByAddr", js_add_class_by_addr);
-    js.add_function("__removeClassByAddr", js_remove_class_by_addr);
-    js.add_function("__toggleClassByAddr", js_toggle_class_by_addr);
-    js.add_function("__getAttribute", js_get_attribute);
-    js.add_function("__querySelectorAllByAddr", js_query_selector_all_by_addr);
+    install_js_api(js, dom);
 
-    // Inject browser-like API
-    js.execute(
-        "const console = {"
-        "  log: (...args) => print(...args),"
-        "  error: (...args) => print('ERROR:', ...args),"
-        "  warn: (...args) => print('WARN:', ...args),"
-        "  info: (...args) => print('INFO:', ...args)"
-        "};"
-        "const linweb = {"
-        "  renderer: { info: () => __glRendererInfo() },"
-        "  debug: {"
-        "    renderer: () => { const info = __glRendererInfo(); console.info('OpenGL renderer', info); return info; },"
-        "    glErrors: () => { const errors = __glDrainErrors(); if (errors.length) console.error('OpenGL errors', errors); return errors; }"
-        "  },"
-        "  storage: {"
-        "    list: () => __storageList(),"
-        "    mount: (dev) => __storageMount(dev),"
-        "    unmount: (path) => __storageUnmount(path),"
-        "    format: (dev, fs, label, confirm) => __storageFormat(dev, fs, label || '', confirm || ''),"
-        "    readDir: (path) => __storageListDir(path),"
-        "    readFile: (path, maxBytes) => __storageReadFile(path, maxBytes || 0),"
-        "    writeFile: (path, data) => __storageWriteFile(path, String(data)),"
-        "    makeDir: (path) => __storageMakeDir(path),"
-        "    remove: (path) => __storageRemove(path)"
-        "  },"
-        "  audio: {"
-        "    cards: () => __audioCards(),"
-        "    getVolume: (card) => __audioGetVolume(card || 0),"
-        "    setVolume: (card, percent) => __audioSetVolume(card || 0, percent),"
-        "    setMute: (card, muted) => __audioSetMute(card || 0, muted ? 1 : 0),"
-        "    play: (path, card, marginMs) => __audioPlay(path, card === undefined ? -1 : card, marginMs || 1000),"
-        "    stop: () => __audioStop(),"
-        "    pause: () => __audioPause(),"
-        "    resume: () => __audioResume(),"
-        "    status: () => __audioStatus()"
-        "  }"
-        "};"
-        "const window = {"
-        "  linweb: linweb,"
-        "  _listeners: {},"
-        "  _raf_callbacks: [],"
-        "  _timeouts: [],"
-        "  dispatchEvent: (targetId, type, data) => {"
-        "    const key = targetId + ':' + type;"
-        "    if (window._listeners[key]) {"
-        "      window._listeners[key].forEach(cb => cb(data));"
-        "    }"
-        "  },"
-        "  addEventListener: (type, callback) => {"
-        "    const key = 'window:' + type;"
-        "    if (!window._listeners[key]) window._listeners[key] = [];"
-        "    window._listeners[key].push(function(evt) { return callback.call(window, evt); });"
-        "  },"
-        "  requestAnimationFrame: (callback) => {"
-        "    window._raf_callbacks.push(callback);"
-        "  },"
-        "  setTimeout: (callback, delay) => {"
-        "    window._timeouts.push({ cb: callback, time: Date.now() + (delay || 0) });"
-        "  },"
-        "  _run_raf: () => {"
-        "    const callbacks = window._raf_callbacks;"
-        "    window._raf_callbacks = [];"
-        "    callbacks.forEach(cb => cb());"
-        "    const now = Date.now();"
-        "    const pending = window._timeouts;"
-        "    window._timeouts = [];"
-        "    pending.forEach(t => {"
-        "      if (now >= t.time) t.cb();"
-        "      else window._timeouts.push(t);"
-        "    });"
-        "  }"
-        "};"
-        "const requestAnimationFrame = window.requestAnimationFrame;"
-        "const setTimeout = window.setTimeout;"
-        "const document = {"
-        "  _wrap: (node) => ({"
-        "    _addr: node._addr,"
-        "    tagName: node.tagName,"
-        "    getAttribute: (name) => __getAttribute(node._addr, name),"
-        "    get className() { return __getClassName(node._addr); },"
-        "    set className(val) { __setClassName(node._addr, val); },"
-        "    get textContent() { return __getTextContent(node._addr); },"
-        "    set textContent(val) { __setTextContent(node._addr, val); },"
-        "    get innerText() { return __getTextContent(node._addr); },"
-        "    set innerText(val) { __setTextContent(node._addr, val); },"
-        "    get innerHTML() { return __getInnerHTML(node._addr); },"
-        "    set innerHTML(val) { __setInnerHTML(node._addr, val); },"
-        "    style: {"
-        "      set backgroundColor(val) { __setStylePropertyByAddr(node._addr, 'background-color', val); },"
-        "      set color(val) { __setStylePropertyByAddr(node._addr, 'color', val); },"
-        "      set display(val) { __setStylePropertyByAddr(node._addr, 'display', val); },"
-        "      set opacity(val) { __setStylePropertyByAddr(node._addr, 'opacity', val); },"
-        "      set transform(val) { __setStylePropertyByAddr(node._addr, 'transform', val); }"
-        "    },"
-        "    classList: {"
-        "      add: (...args) => __addClassByAddr(node._addr, ...args),"
-        "      remove: (...args) => __removeClassByAddr(node._addr, ...args),"
-        "      toggle: (cls, force) => __toggleClassByAddr(node._addr, cls, force)"
-        "    },"
-        "    addEventListener: (type, callback) => {"
-        "      const key = node._addr + ':' + type;"
-        "      if (!window._listeners[key]) window._listeners[key] = [];"
-        "      const self = document._wrap(node);"
-        "      window._listeners[key].push(function(evt) { return callback.call(self, evt); });"
-        "    },"
-        "    appendChild: (child) => {"
-        "      __appendChild(node._addr, child._addr);"
-        "      return child;"
-        "    },"
-        "    querySelectorAll: (selector) => {"
-        "      return __querySelectorAllByAddr(node._addr, selector).map(n => document._wrap(n));"
-        "    },"
-        "    querySelector: (selector) => {"
-        "      const all = __querySelectorAllByAddr(node._addr, selector).map(n => document._wrap(n));"
-        "      return all.length > 0 ? all[0] : null;"
-        "    }"
-        "  }),"
-        "  createElement: (tagName) => {"
-        "    const node = __createElement(tagName);"
-        "    return document._wrap(node);"
-        "  },"
-        "  getElementById: (id) => {"
-        "    const node = __getElementById(id);"
-        "    return node ? document._wrap(node) : null;"
-        "  },"
-        "  getElementsByClassName: (name) => {"
-        "    return __querySelectorAll('.' + name).map(n => document._wrap(n));"
-        "  },"
-        "  querySelectorAll: (selector) => {"
-        "    return __querySelectorAll(selector).map(n => document._wrap(n));"
-        "  },"
-        "  querySelector: (selector) => {"
-        "    const all = document.querySelectorAll(selector);"
-        "    return all.length > 0 ? all[0] : null;"
-        "  },"
-        "  addEventListener: (type, callback) => {"
-        "    const key = 'document:' + type;"
-        "    if (!window._listeners[key]) window._listeners[key] = [];"
-        "    window._listeners[key].push(function(evt) { return callback.call(document, evt); });"
-        "  },"
-        "  get body() { return document.querySelector('body'); },"
-        "  get documentElement() { return document.querySelector('html'); }"
-        "};"
-    );
-
-    // Load scripts
-    std::vector<std::shared_ptr<ElementNode>> scripts;
-    find_tags(dom, "script", scripts);
-    for (auto& script : scripts) {
-        if (script->data.attributes.count("src")) {
-            std::string js_path = resolve_resource_path(html_base_dir, script->data.attributes.at("src"));
-            std::string js_code = read_file(js_path);
-            if (!js_code.empty()) js.execute(js_code);
-        } else {
-            std::string js_code;
-            for (const auto& child : script->children) {
-                if (child->type() == NodeType::Text) {
-                    js_code += std::static_pointer_cast<TextNode>(child)->data;
-                }
-            }
-            if (!js_code.empty()) js.execute(js_code);
+    // A measure read by a script (offsetWidth, getBoundingClientRect) first finishes the style and layout the script
+    // changed, as a browser does. The stylesheet, the viewport and the hovered node live here, so the bindings ask
+    // through this.
+    std::shared_ptr<Node> current_hovered_dom_node;
+    // The hover, the focus and the active node of the last style build: while they hold, what the selectors gave for the
+    // nodes no script touched still holds, and a build that only moves animations or follows a script change near some
+    // nodes matches no selector again for the rest.
+    const Node* last_hovered = nullptr;
+    const Node* last_focused = nullptr;
+    const Node* last_active = nullptr;
+    auto same_inputs = [&]() {
+        return current_hovered_dom_node.get() == last_hovered && g_focused_node.get() == last_focused && g_active_node.get() == last_active;
+    };
+    g_flush_layout = [&]() {
+        absorb_forms_dirty();
+        if (!g_dom_dirty && g_style_tree && g_layout_tree) return;
+        StyleEngine::set_reuse_matched_styles(g_style_tree && same_inputs() && StyleEngine::matched_scoped());
+        last_hovered = current_hovered_dom_node.get();
+        last_focused = g_focused_node.get();
+        last_active = g_active_node.get();
+        g_dom_dirty = false;
+        g_style_tree = StyleEngine::build_style_tree(dom, stylesheet, current_hovered_dom_node, g_focused_node, g_active_node, get_platform_time(), viewport.content.width, viewport.content.height);
+        g_layout_tree = LayoutEngine::build_layout_tree(g_style_tree);
+        if (g_layout_tree) {
+            apply_scroll_states(g_layout_tree);
+            g_layout_tree->layout(viewport);
         }
-    }
+    };
 
-    js.execute("window.dispatchEvent('document', 'DOMContentLoaded', {});");
+    run_page_scripts(js, dom, html_base_dir);
 
     // 11. Main Loop
     int last_fbw = fbw;
     int last_fbh = fbh;
     std::shared_ptr<Node> prev_hovered_dom_node;
 
+    // Frame pacing. The loop has no vsync: left alone it draws as fast as it can even when nothing changes, which in a
+    // virtual machine takes the CPU the transitions need. A frame is drawn when something changed (or moves), at most
+    // every FRAME_S; a still page is redrawn every IDLE_REDRAW_S, which keeps the text caret blinking and refreshes the
+    // window after it was covered.
+    const double FRAME_S = 1.0 / 60.0;
+    const double IDLE_REDRAW_S = 0.1;
+    double last_draw = 0.0;
+    double last_mouse_x = -1.0, last_mouse_y = -1.0;
+    std::map<std::shared_ptr<Node>, float> last_scroll_states;
+    int last_video_w = 0, last_video_h = 0;
+
     while (!window.should_close()) {
+        const double frame_start = get_platform_time();
         // Handle Resize
         window.get_framebuffer_size(fbw, fbh);
-        if (fbw != last_fbw || fbh != last_fbh) {
+        const bool viewport_resized = (fbw != last_fbw || fbh != last_fbh);
+        if (viewport_resized) {
             viewport.content = {0, 0, static_cast<float>(fbw), static_cast<float>(fbh)};
+            g_viewport_width = viewport.content.width;
+            g_viewport_height = viewport.content.height;
             Renderer::set_viewport(fbw, fbh);
             last_fbw = fbw;
             last_fbh = fbh;
         }
 
         // Handle Hover & Click
+        const double script_t0 = get_platform_time();
         mouse_handler.handle_hover_and_click(&window, g_js_engine);
         auto& mouse_state = mouse_handler.get_state();
-        auto current_hovered_dom_node = mouse_state.current_hovered_dom_node;
+        current_hovered_dom_node = mouse_state.current_hovered_dom_node;
 
         js.execute("if (window._run_raf) window._run_raf();");
+        const double script_ms = (get_platform_time() - script_t0) * 1000.0;
 
-        bool viewport_changed = (fbw != last_fbw || fbh != last_fbh);
+        // the picture of a video decides the size of its box: the layout kept from earlier frames is not valid any more
+        {
+            int video_w = 0, video_h = 0;
+            if (!video::current_size(video_w, video_h)) video_w = video_h = 0;
+            if (video_w != last_video_w || video_h != last_video_h) {
+                last_video_w = video_w;
+                last_video_h = video_h;
+                ++g_layout_epoch;
+                g_dom_dirty = true;
+            }
+        }
+
+        absorb_forms_dirty();
+
+        bool viewport_changed = viewport_resized;
         bool input_changed = (prev_hovered_dom_node != current_hovered_dom_node) || mouse_state.had_click_event;
         bool layout_affecting_animations = StyleEngine::has_layout_affecting_animations();
         bool needs_full_rebuild = viewport_changed || input_changed || layout_affecting_animations || g_dom_dirty || !g_style_tree || !g_layout_tree;
 
         g_anim_debug_entries.clear();
 
+        const bool animating = StyleEngine::has_running_animations();
+
+        // Phase timings for F3 (and R2 on the gamepad): style, layout, paint and the whole frame.
+        const double style_t0 = get_platform_time();
+        double style_ms = 0.0;
+        double layout_ms = 0.0;
+        double paint_ms = 0.0;
+        g_layout_calls = 0;
+        g_layout_hits = 0;
+        clear_layout_call_breakdown();
+
+        // a rebuild that only moves a running transition or animation (same as app/frame.cpp of the original): it is not
+        // counted as a full rebuild by the profiler
+        bool animation_only = false;
         if (needs_full_rebuild) {
+            // A frame that only moves a running transition matches no selector again: the page, the hover, the focus
+            // and the stylesheet are the ones of the last full build, so what the selectors gave still holds. A frame
+            // after a script change matches again only the nodes around what the script touched.
+            const bool inputs_held = !viewport_changed && !input_changed && same_inputs() && g_style_tree;
+            animation_only = layout_affecting_animations && !g_dom_dirty && inputs_held;
+            StyleEngine::set_reuse_matched_styles(inputs_held && (layout_affecting_animations || g_dom_dirty) &&
+                                                  (!g_dom_dirty || StyleEngine::matched_scoped()));
+            last_hovered = current_hovered_dom_node.get();
+            last_focused = g_focused_node.get();
+            last_active = g_active_node.get();
             g_dom_dirty = false;
             g_style_tree = StyleEngine::build_style_tree(dom, stylesheet, current_hovered_dom_node, g_focused_node, g_active_node, get_platform_time(), viewport.content.width, viewport.content.height);
+            style_ms = (get_platform_time() - style_t0) * 1000.0;
+            const double layout_t0 = get_platform_time();
             g_layout_tree = LayoutEngine::build_layout_tree(g_style_tree);
             if (g_layout_tree) {
                 apply_scroll_states(g_layout_tree);
                 g_layout_tree->layout(viewport);
             }
+            layout_ms = (get_platform_time() - layout_t0) * 1000.0;
         } else {
             update_animations_on_tree(g_style_tree, stylesheet, get_platform_time(), viewport.content.width, viewport.content.height);
+            style_ms = (get_platform_time() - style_t0) * 1000.0;
         }
         prev_hovered_dom_node = current_hovered_dom_node;
+
+        // Is there anything new to draw? (the scroll position and the mouse are read from what the handlers keep)
+        const bool scrolled = g_scroll_states != last_scroll_states;
+        const bool mouse_moved = mouse_state.px != last_mouse_x || mouse_state.py != last_mouse_y;
+        const bool video_playing = video::status().playing;
+        const bool changed = needs_full_rebuild || animating || scrolled || mouse_moved || input_changed || video_playing ||
+                             g_debug_mode_active || g_show_node_tree;
+        if (!changed && frame_start - last_draw < IDLE_REDRAW_S) {
+            window.poll_events();
+            std::this_thread::sleep_for(std::chrono::milliseconds(4));
+            continue;
+        }
+        last_scroll_states = g_scroll_states;
+        last_mouse_x = mouse_state.px;
+        last_mouse_y = mouse_state.py;
+        last_draw = frame_start;
 
         // Render
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -501,7 +423,9 @@ int main(int argc, char** argv) {
                 Renderer::set_debug_box(box);
             }
 
+            const double paint_t0 = get_platform_time();
             Renderer::render(g_layout_tree);
+            paint_ms = (get_platform_time() - paint_t0) * 1000.0;
 
             if (debug_mode == DebugType::Anim && !g_anim_debug_entries.empty()) {
                 float panel_x = 10.0f, panel_y = 10.0f;
@@ -555,10 +479,23 @@ int main(int argc, char** argv) {
             }
         }
 
+        perf::draw_overlay(fbw);
+        const double swap_t0 = get_platform_time();
         window.swap_buffers();
         window.poll_events();
+        gamepad_input::poll(keyboard_handler);
+        const double swap_end = get_platform_time();
+        perf::record(script_ms, style_ms, layout_ms, paint_ms, (swap_end - swap_t0) * 1000.0, (swap_end - frame_start) * 1000.0, swap_end,
+                     g_layout_calls, g_layout_hits, needs_full_rebuild && !animation_only);
+
+        // no more than FRAME_S per frame: the rest of it is left to the other processes
+        const double spent = get_platform_time() - frame_start;
+        if (spent < FRAME_S) std::this_thread::sleep_for(std::chrono::duration<double>(FRAME_S - spent));
     }
 
     linweb::audio::stop();
+    linweb::net::webserver_stop();
+    linweb::nodelite::stop_all();
+    linweb::video::shutdown();
     return 0;
 }

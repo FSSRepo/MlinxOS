@@ -7,8 +7,9 @@ function createMusicUI(options) {
     const MUSIC_ROOT = '/mnt';
     const VOLUME_STEP = 5;
     const DEFAULT_VOLUME = 70;   // used when the mixer starts muted or at 0% (QEMU's HDA card does)
+    const FADE_MS = 300;         // crossfade with the storage browser (fade-in / fade-out in style.css)
 
-    const ui = options;           // { panel, title, subtitle, list, hint, setStatus }
+    const ui = options;           // { panel, title, subtitle, list, hint, progress (a <progress>), setStatus }
     const state = {
         mode: null,               // null | browser | player
         path: MUSIC_ROOT,
@@ -70,30 +71,39 @@ function createMusicUI(options) {
 
     // ---- rendering --------------------------------------------------------
     function showRows(rows, index) {
-        ui.list.innerHTML = '';
         const start = Math.min(Math.max(0, index - 3), Math.max(0, rows.length - PANEL_ROWS));
         const end = Math.min(rows.length, start + PANEL_ROWS);
+        const cells = xmbListRows(ui.list, end - start);
         for (let i = start; i < end; i++) {
-            const row = document.createElement('div');
+            const entry = rows[i];
+            const label = (entry && typeof entry === 'object') ? entry.label : entry;
+            const icon = (entry && typeof entry === 'object') ? entry.icon : undefined;
+            const row = cells[i - start];
             row.className = 'sp-item' + (i === index ? ' active' : '');
-            row.innerText = rows[i];
-            ui.list.appendChild(row);
+            if (typeof xmbFillItem === 'function') xmbFillItem(row, label, icon);
+            else row.innerText = label;
         }
     }
 
     function draw(title, subtitle, rows, index, hint) {
-        ui.panel.classList.add('visible');
+        xmbSetPanel(ui.panel, true);
         ui.title.innerText = title;
         ui.subtitle.innerText = subtitle;
         showRows(rows, index);
         ui.hint.innerText = hint;
+        xmbRevealSelection(ui.panel);
     }
 
     function browserRows() {
         const rows = [];
-        if (state.path !== MUSIC_ROOT) rows.push({ label: '..', up: true });
+        if (state.path !== MUSIC_ROOT) rows.push({ label: 'Parent folder', up: true, icon: 'up' });
         state.entries.forEach(entry => {
-            rows.push({ label: entry.dir ? '[DIR] ' + entry.name : entry.name, name: entry.name, dir: entry.dir });
+            rows.push({
+                label: entry.name,
+                name: entry.name,
+                dir: entry.dir,
+                icon: entry.dir ? 'folder' : 'music'
+            });
         });
         return rows;
     }
@@ -108,11 +118,29 @@ function createMusicUI(options) {
     }
 
     function render() {
+        // the player takes the whole screen; the browser keeps the column of the XMB
+        if (state.mode === 'player' && !ui.panel.classList.contains('fullscreen')) {
+            if (state.fromStorage) {
+                // opened from the storage browser: it fades in over the full screen instead of growing
+                ui.panel.classList.add('fullscreen');
+                xmbSetPanel(ui.panel, true);
+                ui.panel.classList.remove('fade-in');
+                void ui.panel.offsetWidth;
+                ui.panel.classList.add('fade-in');
+            } else {
+                // show the panel where it normally is first, so the growth to full screen has a start point
+                ui.panel.classList.remove('fullscreen');
+                xmbSetPanel(ui.panel, true);
+                void ui.panel.offsetWidth;
+            }
+        }
+        if (state.mode === 'player') ui.panel.classList.add('fullscreen');
+        else ui.panel.classList.remove('fullscreen');
         if (state.mode === 'browser') {
             const rows = browserRows();
             const sub = state.message || state.error ||
                 (state.entries.length ? state.entries.length + ' item(s)' : 'No folders or MP3 files here. Mount a disk from Storage first.');
-            draw('Music: ' + state.path, sub, rows.map(r => r.label), state.index,
+            draw('Music: ' + state.path, sub, rows, state.index,
                 'Up/Down: select   Enter: open/play   Esc: ' + (state.path === MUSIC_ROOT ? 'close' : 'back'));
         } else if (state.mode === 'player') {
             const status = linweb.audio.status();
@@ -126,7 +154,18 @@ function createMusicUI(options) {
             } else sub = name + '\nStopped';
             draw('Music Player', sub, playerRows(status), state.index,
                 'Up/Down: select   Enter: run   Left/Right: volume   Esc: back (keeps playing)');
+            // position in the track: a <progress> bar (the duration is an estimate for VBR files, so it is never full-scale exact)
+            if (status.duration > 0 && (status.playing || status.position > 0)) {
+                ui.progress.max = status.duration;
+                ui.progress.value = Math.min(status.position, status.duration);
+            } else {
+                ui.progress.removeAttribute('value');
+            }
+            // a stopped track has no position to show
+            if (status.playing || status.paused) ui.progress.classList.add('visible');
+            else ui.progress.classList.remove('visible');
         }
+        if (state.mode !== 'player') ui.progress.classList.remove('visible');
     }
 
     // A freshly booted mixer is often muted at 0%, which would play in silence.
@@ -224,6 +263,7 @@ function createMusicUI(options) {
 
     // ---- input ------------------------------------------------------------
     function open() {
+        state.fromStorage = false;
         state.card = pickCard();
         state.message = state.card < 0 ? 'No sound card found (QEMU needs -device intel-hda -device hda-duplex)' : '';
         if (state.track && linweb.audio.status().playing) {
@@ -240,7 +280,8 @@ function createMusicUI(options) {
 
     function close() {
         state.mode = null;
-        ui.panel.classList.remove('visible');
+        xmbSetPanel(ui.panel, false);
+        ui.progress.classList.remove('visible');
     }
 
     function move(delta, length) {
@@ -264,12 +305,12 @@ function createMusicUI(options) {
             else if (enter && rows.length) {
                 const row = rows[state.index];
                 state.message = '';
-                if (row.up) { loadDir(parentPath(state.path)); render(); }
-                else if (row.dir) { loadDir(joinPath(state.path, row.name)); render(); }
+                if (row.up) { loadDir(parentPath(state.path)); render(); xmbSlideBack(ui.list); }
+                else if (row.dir) { loadDir(joinPath(state.path, row.name)); render(); xmbSlideForward(ui.list); }
                 else if (state.card < 0) { state.message = 'No sound card found'; render(); }
                 else openFile(row.name);
             } else if (back) {
-                if (state.path !== MUSIC_ROOT) { loadDir(parentPath(state.path)); render(); }
+                if (state.path !== MUSIC_ROOT) { loadDir(parentPath(state.path)); render(); xmbSlideBack(ui.list); }
                 else close();
             }
         } else if (state.mode === 'player') {
@@ -279,7 +320,21 @@ function createMusicUI(options) {
             else if (left) changeVolume(-VOLUME_STEP);
             else if (right) changeVolume(VOLUME_STEP);
             else if (enter) runPlayerRow(rows[state.index]);
-            else if (back) {
+            else if (back && state.onExit) {
+                // The music keeps playing in the background; the caller (the storage browser) takes the screen
+                const done = state.onExit;
+                state.onExit = null;
+                state.mode = null;
+                ui.progress.classList.remove('visible');
+                // fade out, then hide it and let the storage browser fade in
+                ui.panel.classList.remove('fade-in');
+                ui.panel.classList.add('fade-out');
+                setTimeout(() => {
+                    ui.panel.classList.remove('fade-out', 'fullscreen');
+                    xmbSetPanel(ui.panel, false);
+                    done();
+                }, FADE_MS);
+            } else if (back) {
                 state.mode = 'browser';
                 state.message = '';
                 loadDir(state.track ? state.track.dir : MUSIC_ROOT);
@@ -288,8 +343,24 @@ function createMusicUI(options) {
         }
     }
 
+    // A file opened in the storage browser: the player takes the folder of the file
+    // onExit (optional) is called on Esc instead of the player's own browser: the caller takes the screen back
+    function playPath(path, onExit) {
+        state.card = pickCard();
+        state.onExit = onExit || null;
+        state.fromStorage = !!onExit;
+        loadDir(parentPath(path));
+        openFile(baseName(path));
+    }
+
     return {
         open: open,
+        play: playPath,
+        // another player takes the sound: the track stops and the next one does not start by itself
+        stop: () => {
+            state.autoNext = false;
+            if (state.track) linweb.audio.stop();
+        },
         handleKey: handleKey,
         isOpen: () => state.mode !== null
     };

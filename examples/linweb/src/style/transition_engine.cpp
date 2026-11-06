@@ -1,6 +1,7 @@
 #include "style/transition_engine.h"
 #include "style/colors.h"
 #include "style/transform_parser.h"
+#include "layout/layout_engine.h"
 #include <sstream>
 #include <cmath>
 #include <algorithm>
@@ -86,6 +87,11 @@ static std::string interpolate_box_shadow(const std::string& start_value, const 
 
     DropShadowValue v1 = parse_bs(start_value);
     DropShadowValue v2 = parse_bs(end_value);
+    // a shadow that appears or disappears fades in its own colour, not through black
+    bool none1 = start_value.empty() || start_value == "none";
+    bool none2 = end_value.empty() || end_value == "none";
+    if (none1 && !none2) { v1.color = v2.color; v1.color.a = 0.0f; }
+    if (none2 && !none1) { v2.color = v1.color; v2.color.a = 0.0f; }
 
     float rx = lerp(v1.x, v2.x, t);
     float ry = lerp(v1.y, v2.y, t);
@@ -124,10 +130,10 @@ std::string TransitionEngine::interpolate_value(
         result.b = lerp(c1.b, c2.b, eased_t);
         result.a = lerp(c1.a, c2.a, eased_t);
         return color_to_str(result);
-    } else if (property == "box-shadow") {
+    } else if (property == "box-shadow" || property == "text-shadow") {
         return interpolate_box_shadow(start_value, end_value, eased_t);
     } else if (property == "border-radius" || property == "width" || property == "height" ||
-               property == "min-width" ||
+               property == "min-width" || property == "font-size" ||
                property == "padding" || property == "margin" || 
                property.find("padding-") == 0 || property.find("margin-") == 0) {
         
@@ -149,6 +155,12 @@ std::string TransitionEngine::interpolate_value(
             float res = lerp(v1, v2, eased_t);
             return std::to_string(res) + "px";
         }
+    } else if (property == "left" || property == "right" || property == "top" || property == "bottom") {
+        // offsets of a positioned box: calc() and percentages are resolved against the viewport the box sits in
+        float ref = (property == "top" || property == "bottom") ? parent_height : parent_width;
+        float v1 = LayoutEngine::parse_px(start_value, ref);
+        float v2 = LayoutEngine::parse_px(end_value, ref);
+        return std::to_string(lerp(v1, v2, eased_t)) + "px";
     } else if (property == "opacity") {
         float v1 = 1.0f;
         try { v1 = std::stof(start_value); } catch(...) {}
@@ -309,43 +321,85 @@ void TransitionEngine::apply_transitions(
     auto& specified = styled_node->specified_values;
     
     if (specified.count("transition")) {
-        std::string transition_str = specified["transition"];
-
-        size_t first_space = transition_str.find(' ');
-        if (first_space == std::string::npos) return;
-        std::string prop_match = transition_str.substr(0, first_space);
-
-        size_t second_space = transition_str.find(' ', first_space + 1);
-
-        std::string dur_str;
-        std::string timing = "ease";
-
-        if (second_space == std::string::npos) {
-            dur_str = transition_str.substr(first_space + 1);
-        } else {
-            dur_str = transition_str.substr(first_space + 1, second_space - first_space - 1);
-            timing = transition_str.substr(second_space + 1);
+        // "transition" is a comma-separated list: "color 0.3s ease, text-shadow 0.3s ease" (or "all 2s linear")
+        struct TransitionSpec { std::string property; float duration; std::string timing; };
+        std::vector<TransitionSpec> specs;
+        std::string list = specified["transition"];
+        // the items are separated by the commas outside parentheses: cubic-bezier(0.2, 1, 0.3, 1) is one timing function
+        std::vector<std::string> items;
+        {
+            int depth = 0;
+            std::string current;
+            for (char c : list) {
+                if (c == '(') ++depth;
+                else if (c == ')' && depth > 0) --depth;
+                if (c == ',' && depth == 0) { items.push_back(current); current.clear(); }
+                else current += c;
+            }
+            items.push_back(current);
         }
-        
-        float duration = 0.0f;
-        if (!dur_str.empty()) {
-            if (dur_str.find("ms") != std::string::npos) duration = std::stof(dur_str) / 1000.0f;
-            else duration = std::stof(dur_str);
+        for (const std::string& item : items) {
+            std::istringstream words(item);
+            std::string property, duration_text, timing = "ease";
+            words >> property;
+            if (property.empty()) continue;
+            words >> duration_text;
+            std::string rest;
+            std::getline(words, rest);
+            rest.erase(0, rest.find_first_not_of(" 	"));
+            if (!rest.empty()) {
+                // a timing function (its parentheses included), possibly followed by a delay (the delay is not used)
+                size_t end = rest.find_first_of(" (");
+                if (end != std::string::npos && rest[end] == '(') {
+                    size_t close = rest.find(')', end);
+                    end = close == std::string::npos ? rest.size() : close + 1;
+                }
+                timing = rest.substr(0, end == std::string::npos ? rest.size() : end);
+            }
+            float duration = 0.0f;
+            if (!duration_text.empty()) {
+                try {
+                    duration = duration_text.find("ms") != std::string::npos ? std::stof(duration_text) / 1000.0f : std::stof(duration_text);
+                } catch (...) {
+                    duration = 0.0f;
+                }
+            }
+            specs.push_back({property, duration, timing});
         }
+
+        auto find_spec = [&](const std::string& prop) -> const TransitionSpec* {
+            for (const auto& spec : specs) if (spec.property == prop) return &spec;
+            for (const auto& spec : specs) if (spec.property == "all") return &spec;
+            return nullptr;
+        };
 
         if (g_last_specified_values.count(node_ptr)) {
             auto& last_spec = g_last_specified_values[node_ptr];
-            
+            // An element that was display:none has no computed style to start from: what changes as it appears does
+            // not transition, as in a browser.
+            bool was_hidden = last_spec.count("display") && last_spec.at("display") == "none";
+            if (was_hidden) g_active_transitions.erase(node_ptr);
+
             std::vector<std::string> animatable_props = {
                 "color", "background-color", "background", "box-shadow",
                 "border-radius", "width", "height", "min-width",
                 "padding", "padding-left", "padding-right", "padding-top", "padding-bottom",
                 "margin", "margin-left", "margin-right", "margin-top", "margin-bottom",
-                "transform", "opacity", "filter"
+                "transform", "opacity", "filter", "left", "right", "top", "bottom", "font-size", "text-shadow"
             };
             
             for (const auto& prop : animatable_props) {
-                if (prop_match == "all" || prop_match == prop) {
+                if (was_hidden) break;
+                // an offset without a value (auto) has nothing to start from or end at
+                bool is_offset = prop == "left" || prop == "right" || prop == "top" || prop == "bottom";
+                if (is_offset) {
+                    auto fixed = [&](const PropertyMap& values) {
+                        auto it = values.find(prop);
+                        return it != values.end() && it->second != "auto";
+                    };
+                    if (!fixed(specified) || !fixed(last_spec)) continue;
+                }
+                if (const TransitionSpec* spec = find_spec(prop)) {
                     std::string current_target;
                     std::string color_override = get_specified_color(specified, prop);
                     if (!color_override.empty()) {
@@ -362,7 +416,7 @@ void TransitionEngine::apply_transitions(
                         else if (prop == "color") current_target = "black";
                         else if (prop == "transform") current_target = "none";
                         else if (prop == "opacity") current_target = "1.0";
-                        else if (prop == "box-shadow") current_target = "none";
+                        else if (prop == "box-shadow" || prop == "text-shadow") current_target = "none";
                         else current_target = "0px";
                     }
 
@@ -382,7 +436,7 @@ void TransitionEngine::apply_transitions(
                         else if (prop == "color") last_val = "black";
                         else if (prop == "transform") last_val = "none";
                         else if (prop == "opacity") last_val = "1.0";
-                        else if (prop == "box-shadow") last_val = "none";
+                        else if (prop == "box-shadow" || prop == "text-shadow") last_val = "none";
                         else last_val = "0px";
                     }
 
@@ -398,8 +452,8 @@ void TransitionEngine::apply_transitions(
 
                         ts.end_value = current_target;
                         ts.start_time = current_time;
-                        ts.duration = duration;
-                        ts.timing_function = timing;
+                        ts.duration = spec->duration;
+                        ts.timing_function = spec->timing;
                         ts.last_animated_value = ts.start_value;
                         g_active_transitions[node_ptr][prop] = ts;
                     }

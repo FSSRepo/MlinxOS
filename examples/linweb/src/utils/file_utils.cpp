@@ -60,6 +60,14 @@ std::string get_directory(const std::string& path) {
     return ".";
 }
 
+std::string g_html_base_dir;
+
+std::string resolve_image_src(const std::string& src) {
+    // absolute paths, URLs and data: URIs are used as they are
+    if (src.empty() || src.find(':') != std::string::npos || src[0] == '/' || src[0] == '\\') return src;
+    return resolve_resource_path(g_html_base_dir, src);
+}
+
 std::string resolve_resource_path(const std::string& base_dir, const std::string& resource_path) {
     std::string resolved;
 

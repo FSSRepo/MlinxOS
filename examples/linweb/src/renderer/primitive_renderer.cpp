@@ -1,10 +1,47 @@
 #include "renderer/primitive_renderer.h"
 #include "renderer/renderer_internal.h"
 #include <algorithm>
+#include <chrono>
 
 namespace linweb {
 
-void Renderer::draw_rect(float x, float y, float width, float height, float r, float g, float b, float a, float radius, float blur, float invert, const Gradient& gradient, float border_width) {
+void Renderer::draw_ps3_background(float x, float y, float width, float height) {
+    if (!RendererState::program_bg || RendererState::vbo_color == 0) return;
+    if (width <= 0.0f || height <= 0.0f) return;
+
+    static const auto start_time = std::chrono::steady_clock::now();
+    float elapsed = std::chrono::duration<float>(std::chrono::steady_clock::now() - start_time).count();
+
+    glUseProgram(RendererState::program_bg);
+    glUniformMatrix4fv(RendererState::program_bg_u_model, 1, GL_FALSE, RendererState::current_model.data());
+    glUniform1f(RendererState::program_bg_u_time, elapsed);
+
+    float verts[] = {
+        x, y, 0.0f, 0.0f,
+        x + width, y, 1.0f, 0.0f,
+        x + width, y + height, 1.0f, 1.0f,
+
+        x, y, 0.0f, 0.0f,
+        x + width, y + height, 1.0f, 1.0f,
+        x, y + height, 0.0f, 1.0f
+    };
+
+    glBindBuffer(GL_ARRAY_BUFFER, RendererState::vbo_color);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(verts), verts, GL_STREAM_DRAW);
+
+    glEnableVertexAttribArray(RendererState::program_bg_a_pos);
+    glVertexAttribPointer(RendererState::program_bg_a_pos, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(RendererState::program_bg_a_uv);
+    glVertexAttribPointer(RendererState::program_bg_a_uv, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    glDisableVertexAttribArray(RendererState::program_bg_a_pos);
+    glDisableVertexAttribArray(RendererState::program_bg_a_uv);
+    glUseProgram(0);
+}
+
+void Renderer::draw_rect(float x, float y, float width, float height, float r, float g, float b, float a, float radius, float blur, float invert, const Gradient& gradient, float border_width, bool is_shadow) {
     if (!RendererState::program_color || RendererState::vbo_color == 0) return;
     if (width <= 0.0f || height <= 0.0f) return;
 
@@ -16,6 +53,7 @@ void Renderer::draw_rect(float x, float y, float width, float height, float r, f
     glUniform2f(RendererState::program_color_u_size, width, height);
     glUniform1f(RendererState::program_color_u_radius, radius);
     glUniform1f(RendererState::program_color_u_blur, blur);
+    glUniform1f(RendererState::program_color_u_shadow, is_shadow ? 1.0f : 0.0f);
     glUniform1f(RendererState::program_color_u_invert, invert);
     glUniform1f(RendererState::program_color_u_border_width, border_width);
 

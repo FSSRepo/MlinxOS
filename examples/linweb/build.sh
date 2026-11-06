@@ -35,6 +35,17 @@ fi
 "$CMAKE" --build "$BUILD_DIR" --parallel "$(nproc)"
 
 install -D -m 0755 "$BUILD_DIR/linweb" "$BUILDROOT_DIR/output/target/usr/bin/linweb"
+
+# Web server that linweb switches on and off (System > Web Server), installed as /usr/sbin/steward-httpd.
+HTTPD_SRC="$SCRIPT_DIR/../http-server/server.c"
+TARGET_CC=$(ls "$BUILDROOT_DIR"/output/host/bin/*-linux-gnu-gcc 2>/dev/null | head -1 || true)
+if [[ -f "$HTTPD_SRC" && -n "$TARGET_CC" ]]; then
+    install -d "$BUILDROOT_DIR/output/target/usr/sbin"
+    "$TARGET_CC" -std=c11 -O2 -Wall -Wextra "$HTTPD_SRC" -o "$BUILDROOT_DIR/output/target/usr/sbin/steward-httpd"
+    echo "Installed /usr/sbin/steward-httpd."
+else
+    echo "WARNING: steward-httpd not built (missing $HTTPD_SRC or the Buildroot compiler); the web server switch will report it." >&2
+fi
 FONT_DIR="$SCRIPT_DIR/assets/fonts"
 PS3_TARGET="$BUILDROOT_DIR/output/target/root/ps3"
 rm -rf "$PS3_TARGET"

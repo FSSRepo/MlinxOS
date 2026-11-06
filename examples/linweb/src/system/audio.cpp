@@ -2,6 +2,7 @@
 
 #ifdef __linux__
 #include "media/mp3/mp3_stream.h"
+#include "system/process.h"
 #include "system/storage.h"
 
 #include <algorithm>
@@ -38,23 +39,6 @@ Result success() {
     return r;
 }
 
-std::string find_tool(const char* name) {
-    std::vector<std::string> dirs;
-    if (const char* path = std::getenv("PATH")) {
-        std::stringstream ss(path);
-        std::string dir;
-        while (std::getline(ss, dir, ':')) {
-            if (!dir.empty() && dir[0] == '/') dirs.push_back(dir + "/");
-        }
-    }
-    for (const char* dir : {"/usr/bin/", "/bin/", "/usr/sbin/", "/sbin/"}) dirs.push_back(dir);
-    for (const std::string& dir : dirs) {
-        std::string candidate = dir + name;
-        if (access(candidate.c_str(), X_OK) == 0) return candidate;
-    }
-    return std::string();
-}
-
 std::string trim(const std::string& text) {
     size_t a = text.find_first_not_of(" \t\r\n");
     if (a == std::string::npos) return std::string();
@@ -62,47 +46,8 @@ std::string trim(const std::string& text) {
     return text.substr(a, b - a + 1);
 }
 
-// Run `args[0]` (resolved in the standard bin dirs) without a shell and capture stdout+stderr.
-bool run_capture(const std::vector<std::string>& args, std::string& output, int& exit_code) {
-    output.clear();
-    exit_code = -1;
-    std::string tool = find_tool(args[0].c_str());
-    if (tool.empty()) {
-        output = args[0] + " is not installed in this system";
-        return false;
-    }
-    int fds[2];
-    if (pipe(fds) != 0) return false;
-    posix_spawn_file_actions_t actions;
-    posix_spawn_file_actions_init(&actions);
-    posix_spawn_file_actions_adddup2(&actions, fds[1], STDOUT_FILENO);
-    posix_spawn_file_actions_adddup2(&actions, fds[1], STDERR_FILENO);
-    posix_spawn_file_actions_addclose(&actions, fds[0]);
-    posix_spawn_file_actions_addclose(&actions, fds[1]);
-    std::vector<char*> argv;
-    std::vector<std::string> copy = args;
-    for (std::string& a : copy) argv.push_back(&a[0]);
-    argv.push_back(nullptr);
-    pid_t pid = 0;
-    int rc = posix_spawn(&pid, tool.c_str(), &actions, nullptr, argv.data(), environ);
-    posix_spawn_file_actions_destroy(&actions);
-    close(fds[1]);
-    if (rc != 0) {
-        close(fds[0]);
-        output = std::strerror(rc);
-        return false;
-    }
-    char chunk[512];
-    ssize_t n;
-    while ((n = read(fds[0], chunk, sizeof(chunk))) > 0) {
-        if (output.size() < 4096) output.append(chunk, static_cast<size_t>(n));
-    }
-    close(fds[0]);
-    int status = 0;
-    waitpid(pid, &status, 0);
-    exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-    return true;
-}
+using process::find_tool;
+using process::run_capture;
 
 const char* kControls[] = {"Master", "PCM", "Speaker", "Headphone"};
 

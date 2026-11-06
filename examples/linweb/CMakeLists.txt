@@ -20,7 +20,9 @@ if(NOT WESTON_PLATFORM)
 endif()
 
 # Add QuickJS
-add_subdirectory(external/quickjs)
+# shared with node-lite: examples/external/quickjs
+set(QUICKJS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../external/quickjs)
+add_subdirectory(${QUICKJS_DIR} ${CMAKE_CURRENT_BINARY_DIR}/external/quickjs)
 
 # MP3 decoder (OpenMP3 plus a frame-by-frame wrapper); its headers use generic names
 # such as types.h, so they stay out of the global include path.
@@ -35,9 +37,23 @@ add_library(linweb_mp3 STATIC
 )
 target_include_directories(linweb_mp3 PRIVATE external/openmp3 src/media/mp3)
 
+# Video: MP4 demuxer, H.264 (FFmpeg's decoder) and AAC (FDK), copied from media-reader. Their headers use generic
+# names (mp4.h, config.h, ...), so their include paths stay private to this library.
+add_subdirectory(external/ffmpeg)
+add_subdirectory(external/libaac)
+add_library(linweb_video STATIC
+    src/media/video/video_player.cpp
+    src/media/mp4/mp4.cpp
+    src/media/mp4/yuv.cpp
+)
+target_include_directories(linweb_video PUBLIC src PRIVATE src/media/mp4 external/ffmpeg external/libaac/include)
+target_link_libraries(linweb_video PUBLIC h264 aac pthread)
+
 # Collect all source files
 set(LINWEB_SOURCES
     src/main.cpp
+    src/app/app_state.cpp
+    src/app/js_api.cpp
     src/core/dom.cpp
     src/core/dom_helpers.cpp
     src/core/navigator.cpp
@@ -63,10 +79,12 @@ set(LINWEB_SOURCES
     src/layout/flex_layout.cpp
     src/layout/grid_layout.cpp
     src/layout/positioned_layout.cpp
+    src/layout/table_layout.cpp
     src/renderer/renderer_core.cpp
     src/renderer/renderer.cpp
     src/renderer/primitive_renderer.cpp
     src/renderer/image_renderer.cpp
+    src/renderer/video_surface.cpp
     src/renderer/text_renderer.cpp
     src/renderer/svg_renderer.cpp
     src/renderer/shader_manager.cpp
@@ -82,17 +100,49 @@ set(LINWEB_SOURCES
     src/scripting/event_bindings.cpp
     src/scripting/timer_bindings.cpp
     src/scripting/console_bindings.cpp
+    src/scripting/window_bindings.cpp
+    src/scripting/layout_bindings.cpp
+    src/scripting/native_bindings.cpp
     src/scripting/storage_bindings.cpp
     src/scripting/audio_bindings.cpp
+    src/scripting/network_bindings.cpp
+    src/scripting/nodelite_bindings.cpp
+    src/scripting/video_bindings.cpp
+    src/scripting/power_bindings.cpp
+    src/scripting/input_bindings.cpp
+    src/scripting/gamepad_bindings.cpp
+    src/scripting/install_bindings.cpp
+    src/scripting/sysinfo_bindings.cpp
+    src/scripting/perf_bindings.cpp
     src/system/storage.cpp
     src/system/audio.cpp
+    src/system/process.cpp
+    src/system/network.cpp
+    src/system/nodelite.cpp
+    src/system/power.cpp
+    src/system/input.cpp
+    src/system/gamepad.cpp
+    src/system/install.cpp
+    src/system/sysinfo.cpp
+    src/system/perf.cpp
     src/utils/file_utils.cpp
+    src/utils/log.cpp
+    src/utils/page_resources.cpp
     src/utils/dom_traversal.cpp
     src/utils/layout_traversal.cpp
     src/utils/scroll_manager.cpp
     src/platform/input_handler.cpp
     src/platform/scroll_handler.cpp
     src/platform/keyboard_handler.cpp
+    src/platform/gamepad_input.cpp
+    src/platform/key_event.cpp
+    src/forms/form_controls.cpp
+    src/forms/form_bindings.cpp
+    src/renderer/form_renderer.cpp
+    src/renderer/custom_font.cpp
+    src/renderer/background_renderer.cpp
+    src/renderer/mask_renderer.cpp
+    src/renderer/shadow_blur.cpp
     src/platform/mouse_handler.cpp
     src/debug/debug_visualizer.cpp
     src/debug/node_tree_view.cpp
@@ -118,7 +168,7 @@ target_include_directories(linweb PRIVATE
     src
     external
     external/glad
-    external/quickjs
+    ${QUICKJS_DIR}
     external/stb
     external/nanosvg
 )
@@ -129,7 +179,7 @@ endif()
 
 # Link libraries
 if(WESTON_PLATFORM)
-    target_link_libraries(linweb PRIVATE GLESv2 wayland-client wayland-egl EGL qjs)
+    target_link_libraries(linweb PRIVATE GLESv2 wayland-client wayland-egl EGL xkbcommon qjs)
     target_compile_definitions(linweb PRIVATE WESTON_PLATFORM)
 elseif(XORG_PLATFORM)
     target_link_libraries(linweb PRIVATE OpenGL::GL X11 EGL qjs)
@@ -145,7 +195,7 @@ target_compile_definitions(linweb PRIVATE
     _GNU_SOURCE
 )
 
-target_link_libraries(linweb PRIVATE linweb_mp3)
+target_link_libraries(linweb PRIVATE linweb_mp3 linweb_video)
 
 # Math library for UNIX
 if(UNIX)

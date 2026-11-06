@@ -19,6 +19,22 @@ static void parse_translate_value(const std::string& s, float& out_val, bool& ou
     }
 }
 
+void TransformParser::apply_translate_property(const std::string& value, Transform& transform) {
+    std::stringstream words(value);
+    std::string x_text, y_text;
+    words >> x_text >> y_text;
+    if (x_text.empty() || x_text == "none") return;
+    float x = 0, y = 0;
+    bool x_percent = false, y_percent = false;
+    parse_translate_value(x_text, x, x_percent);
+    if (!y_text.empty()) parse_translate_value(y_text, y, y_percent);
+    transform.translate_x += x;
+    transform.translate_y += y;
+    transform.translate_x_is_percent = transform.translate_x_is_percent || x_percent;
+    transform.translate_y_is_percent = transform.translate_y_is_percent || y_percent;
+    transform.has_transform = true;
+}
+
 void TransformParser::parse_translate(const std::string& args, Transform& transform, const std::string& func_name) {
     std::stringstream ss_args(args);
     std::string arg1, arg2;

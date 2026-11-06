@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -55,7 +56,9 @@ struct Node {
     ElementData data;
     std::unordered_map<std::string, std::string> style_overrides;
     bool debug_enabled = false;
-    
+    // Never reused, unlike the node's address: state kept per node (transitions) tells a new node from a recycled address
+    uint64_t uid = next_uid();
+
     explicit Node(std::string tag = "") : tag_name(std::move(tag)) {}
     
     virtual NodeType type() const = 0;
@@ -84,6 +87,11 @@ struct Node {
     }
 
 protected:
+    static uint64_t next_uid() {
+        static uint64_t counter = 0;
+        return ++counter;
+    }
+
     void print_indent(int indent) const {
         for (int i = 0; i < indent; ++i) std::cout << "  ";
     }

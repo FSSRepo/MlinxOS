@@ -97,6 +97,8 @@ namespace linweb
             child_container.content.width = container_w;
             child_container.content.height = container_h;
 
+            child->containing_block_width = container_w;
+            child->containing_block_height = container_h;
             child->layout(child_container);
 
             std::string top_str = child->styled_node->value("top");
@@ -131,8 +133,13 @@ namespace linweb
             Dimensions box_container;
             box_container.content.x = child->dimensions.content.x - child->dimensions.margin.left - child->dimensions.padding.left - child->dimensions.border.left;
             box_container.content.y = child->dimensions.content.y - child->dimensions.margin.top - child->dimensions.padding.top - child->dimensions.border.top;
-            box_container.content.width = child->dimensions.content.width;
-            box_container.content.height = child->dimensions.content.height;
+            // a percentage width (and height) refers to the containing block, not to the box's own first size
+            const std::string own_width = child->styled_node->value("width");
+            const std::string own_height = child->styled_node->value("height");
+            box_container.content.width = own_width.find('%') != std::string::npos ? container_w : child->dimensions.content.width;
+            box_container.content.height = own_height.find('%') != std::string::npos ? container_h : child->dimensions.content.height;
+            child->containing_block_width = container_w;
+            child->containing_block_height = container_h;
             child->layout(box_container);
 
             float child_max_y = child->dimensions.content.y + child->total_content_height + child->dimensions.margin.bottom;

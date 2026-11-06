@@ -19,37 +19,20 @@ struct Window::Impl {
     double cursor_x = 0;
     double cursor_y = 0;
     bool mouse_pressed = false;
+    DeadKeys dead_keys;
 };
 
-static Key map_x11_key(KeySym keysym) {
-    if (keysym >= XK_a && keysym <= XK_z)
-        return static_cast<Key>(static_cast<int>(Key::A) + (keysym - XK_a));
-    if (keysym >= XK_A && keysym <= XK_Z)
-        return static_cast<Key>(static_cast<int>(Key::A) + (keysym - XK_A));
-    if (keysym >= XK_0 && keysym <= XK_9)
-        return static_cast<Key>(static_cast<int>(Key::Num0) + (keysym - XK_0));
-    switch (keysym) {
-        case XK_Return:
-        case XK_KP_Enter:
-        case XK_ISO_Enter:
-        case XK_Linefeed: return Key::Enter;
-        case XK_Escape: return Key::Escape;
-        case XK_space: return Key::Space;
-        case XK_BackSpace: return Key::Backspace;
-        case XK_Left: return Key::Left;
-        case XK_Up: return Key::Up;
-        case XK_Right: return Key::Right;
-        case XK_Down: return Key::Down;
-        case XK_Tab: return Key::Tab;
-        case XK_Shift_L: return Key::LeftShift;
-        case XK_Shift_R: return Key::RightShift;
-        case XK_Control_L: return Key::LeftControl;
-        case XK_Control_R: return Key::RightControl;
-        case XK_Alt_L: return Key::LeftAlt;
-        case XK_Alt_R: return Key::RightAlt;
-        case XK_F2: return Key::F2;
-        default: return Key::Unknown;
-    }
+// X11 keyboard modifier state -> KeyMod bits.
+static int x11_mods(unsigned int state) {
+    int mods = 0;
+    if (state & ShiftMask) mods |= ModShift;
+    if (state & LockMask) mods |= ModCapsLock;
+    if (state & ControlMask) mods |= ModControl;
+    if (state & Mod1Mask) mods |= ModAlt;
+    if (state & Mod2Mask) mods |= ModNumLock;
+    if (state & Mod4Mask) mods |= ModMeta;
+    if (state & Mod5Mask) mods |= ModAltGraph;
+    return mods;
 }
 
 Window::Window() : impl_(new Impl()), width_(800), height_(600), title_("Linweb"),
@@ -224,15 +207,31 @@ void Window::poll_events() const {
                 break;
             case KeyPress:
             case KeyRelease: {
-                KeySym keysym = XLookupKeysym(&ev.xkey, 0);
-                Key key = map_x11_key(keysym);
                 Action action = (ev.type == KeyPress) ? Action::Press : Action::Release;
-                if (self->get_key_callback()) {
-                    self->get_key_callback()(self, key, 0, action, 0);
+                // X11 auto-repeat arrives as a Release followed by a Press with the same time
+                // and key: report the pair as a single Repeat.
+                if (ev.type == KeyRelease && XPending(impl_->dpy)) {
+                    XEvent next;
+                    XPeekEvent(impl_->dpy, &next);
+                    if (next.type == KeyPress && next.xkey.time == ev.xkey.time &&
+                        next.xkey.keycode == ev.xkey.keycode) {
+                        XNextEvent(impl_->dpy, &next);
+                        action = Action::Repeat;
+                    }
                 }
-                if (key == Key::Escape && ev.type == KeyPress) {
+                char text[32];
+                KeySym keysym = NoSymbol;
+                XLookupString(&ev.xkey, text, sizeof(text), &keysym, nullptr);   // applies shift, caps lock, AltGr
+                KeySym base = XLookupKeysym(&ev.xkey, 0);                        // the key with no modifiers
+                int mods = x11_mods(ev.xkey.state);
+                KeyEvent key_ev = make_key_event(action, static_cast<int>(ev.xkey.keycode) - 8, mods,
+                                                 static_cast<uint32_t>(keysym), static_cast<uint32_t>(base));
+                if (action != Action::Release) self->impl_->dead_keys.process(static_cast<uint32_t>(keysym), key_ev);
+                // Ctrl+Q closes the application (Escape is left to the page, for dialogs and "back").
+                if (action == Action::Press && (mods & ModControl) && (keysym == XK_q || keysym == XK_Q)) {
                     self->impl_->should_close = true;
                 }
+                self->emit_key(key_ev);
                 break;
             }
             case ButtonPress:

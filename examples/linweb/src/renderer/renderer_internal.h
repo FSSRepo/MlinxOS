@@ -1,6 +1,10 @@
 #pragma once
 #include "renderer/renderer.h"
 #include "gl_wrapper.h"
+#ifndef GL_RGBA8
+// Sized RGBA8 internal format (GL 3.0 / GL_OES_rgb8_rgba8): not declared by the GLESv2 headers of the Weston build.
+#define GL_RGBA8 0x8058
+#endif
 #include <array>
 #include <string>
 #include <vector>
@@ -12,9 +16,9 @@ struct RendererState {
     static unsigned char font_buffer[1 << 20];
     static unsigned char font_bold_buffer[1 << 20];
     static unsigned char font_mono_buffer[1 << 20];
-    static stbtt_bakedchar cdata[96];
-    static stbtt_bakedchar cdata_bold[96];
-    static stbtt_bakedchar cdata_mono[96];
+    static stbtt_bakedchar cdata[224];
+    static stbtt_bakedchar cdata_bold[224];
+    static stbtt_bakedchar cdata_mono[224];
     static GLuint ftex;
     static GLuint ftex_bold;
     static GLuint ftex_mono;
@@ -24,6 +28,8 @@ struct RendererState {
     static float base_font_size;
     static float font_ascent_px;
     static float font_line_height_px;
+    static float font_descent_px;
+    static float font_gap_px;
 
     static int viewport_width;
     static int viewport_height;
@@ -36,6 +42,7 @@ struct RendererState {
     static GLint program_color_u_size;
     static GLint program_color_u_radius;
     static GLint program_color_u_blur;
+    static GLint program_color_u_shadow;
     static GLint program_color_u_invert;
     static GLint program_color_u_grad_type;
     static GLint program_color_u_grad_c1;
@@ -76,6 +83,13 @@ struct RendererState {
     static GLint program_image_u_shadow_color;
     static GLint program_image_a_pos;
     static GLint program_image_a_uv;
+
+    static GLuint program_bg;
+    static GLint program_bg_u_proj;
+    static GLint program_bg_u_model;
+    static GLint program_bg_u_time;
+    static GLint program_bg_a_pos;
+    static GLint program_bg_a_uv;
 
     static void update_proj();
 };

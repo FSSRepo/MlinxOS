@@ -35,28 +35,90 @@
                         <span>Storage</span>
                     </div>
                 </nav>
+            </div>
+            <div id="submenu-viewport">
                 <div id="submenu-container">
                     <!-- The submenu items will be loaded here dynamically -->
                 </div>
             </div>
+            <div id="net-badge"></div>
             <div id="status">Ready</div>
             <pre id="system-info" aria-live="polite"></pre>
+            <div id="system-info-more"></div>
             <div id="storage-panel">
                 <div id="sp-title"></div>
                 <pre id="sp-subtitle"></pre>
                 <div id="sp-list"></div>
                 <div id="sp-hint"></div>
             </div>
+            <div id="net-panel">
+                <div id="np-title"></div>
+                <pre id="np-subtitle"></pre>
+                <div id="np-list"></div>
+                <input id="np-input" class="panel-input" type="password" maxlength="63" placeholder="Password">
+                <div id="np-osk" class="osk"></div>
+                <div id="np-hint"></div>
+            </div>
+            <div id="in-panel">
+                <div id="in-title"></div>
+                <pre id="in-subtitle"></pre>
+                <div id="in-list"></div>
+                <input id="in-input" class="panel-input" type="text" maxlength="16" placeholder="Disk name">
+                <div id="in-osk" class="osk"></div>
+                <div id="in-hint"></div>
+            </div>
+            <div id="nl-panel">
+                <div id="nl-title"></div>
+                <pre id="nl-subtitle"></pre>
+                <div id="nl-list"></div>
+                <input id="nl-input" class="panel-input" type="text" maxlength="200" placeholder="https://example.com">
+                <div id="nl-hint"></div>
+            </div>
+            <div id="vb-panel">
+                <div id="vb-title"></div>
+                <pre id="vb-subtitle"></pre>
+                <div id="vb-list"></div>
+                <div id="vb-hint"></div>
+            </div>
             <div id="music-panel">
                 <div id="mp-title"></div>
                 <pre id="mp-subtitle"></pre>
+                <progress id="mp-progress" class="panel-progress" value="0" max="1"></progress>
                 <div id="mp-list"></div>
                 <div id="mp-hint"></div>
             </div>
         </main>
+        <video id="vp-screen"></video>
+        <div id="vp-controls">
+            <pre id="vp-info"></pre>
+            <div id="vp-seekrow">
+                <span id="vp-time">0:00</span>
+                <input id="vp-seek" type="range" min="0" max="1000" step="1" value="0">
+                <span id="vp-duration">0:00</span>
+            </div>
+            <div id="vp-bottom">
+                <div id="vp-help"></div>
+                <span id="vp-volume-label">Volume</span>
+                <input id="vp-volume" type="range" min="0" max="100" step="1" value="70">
+            </div>
+        </div>
     </div>
+    <div id="shutdown-fade"></div>
+    <script src="js/browser-mocks.js"></script>
+    <script src="js/xmb-view.js"></script>
+    <script src="js/xmb-icons.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/music.js"></script>
+    <div id="power-off" aria-live="polite">
+        <img src="icons/power.svg" alt="" class="po-icon">
+        <div class="po-title">It is now safe to turn off the machine.</div>
+        <div class="po-hint">Press Enter to turn on again</div>
+    </div>
+    <script src="js/osk.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/nodelite.js"></script>
+    <script src="js/video.js"></script>
+    <script src="js/install.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

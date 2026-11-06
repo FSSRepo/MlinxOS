@@ -1,4 +1,5 @@
 #include "scripting/js_context.h"
+#include "utils/log.h"
 #include <iostream>
 
 namespace linweb {
@@ -32,6 +33,7 @@ bool JSContextWrapper::evaluate(const std::string& code, const std::string& file
         JSValue exception = JS_GetException(ctx);
         const char* msg = JS_ToCString(ctx, exception);
         std::cerr << "JS Error: " << msg << std::endl;
+        log_event("js-error", std::string(msg) + " (" + filename + ")");
         JS_FreeCString(ctx, msg);
         JS_FreeValue(ctx, exception);
     }

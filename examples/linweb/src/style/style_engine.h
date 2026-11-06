@@ -36,11 +36,14 @@ struct Transform {
 
 struct AnimationState {
     std::string name;
-    double start_time;
-    double duration;
+    double start_time = 0.0;
+    double duration = 0.0;
+    double delay = 0.0;                   // time before the animation starts advancing
     std::string timing_function;
     std::string iteration_count;
+    std::string fill_mode = "none";       // none, forwards, backwards, both
     bool finished = false;
+    bool layout_affecting = false;
 };
 
 struct StyledNode {
@@ -52,11 +55,14 @@ struct StyledNode {
 
     explicit StyledNode(std::shared_ptr<Node> n) : node(std::move(n)) {}
     
-    std::string value(const std::string& name) const {
+    // By reference: layout, style and the renderer read properties thousands of times a frame, and a copy of each
+    // string is an allocation. The reference holds until the maps change.
+    const std::string& value(const std::string& name) const {
+        static const std::string none;
         auto it = animated_values.find(name);
         if (it != animated_values.end()) return it->second;
         it = specified_values.find(name);
-        return it != specified_values.end() ? it->second : "";
+        return it != specified_values.end() ? it->second : none;
     }
 };
 
@@ -101,6 +107,22 @@ public:
         const std::shared_ptr<Node>& active_node);
 
     static bool has_layout_affecting_animations();
+
+    // Some transition or animation is still moving something: the next frame differs from this one even if nothing else does.
+    static bool has_running_animations();
+
+    // While on, the selector matching of the last full build is reused (the specified values of each element and of its
+    // pseudo-elements). Valid only while the DOM, the hovered/focused/active node and the stylesheet are unchanged, as in
+    // the frames of a running transition; the next build with it off matches the selectors again.
+    static void set_reuse_matched_styles(bool reuse);
+
+    // A script changed the page: what selector matching gave for the subtree of `scope` (and so for the siblings of
+    // the node that changed, which sibling combinators and :nth-child read) is stale. The next reusing build matches
+    // those nodes again and keeps the rest. invalidate_all_matched() marks every node.
+    static void invalidate_matched_subtree(const Node* scope);
+    static void invalidate_matched_all();
+    // True when only invalidate_matched_subtree() marked something since the last build.
+    static bool matched_scoped();
 
 private:
     static std::shared_ptr<StyledNode> build_style_tree_recursive(

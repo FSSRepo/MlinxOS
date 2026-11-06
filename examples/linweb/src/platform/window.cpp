@@ -31,6 +31,7 @@ static Key map_glfw_key(int glfw_key) {
         case GLFW_KEY_LEFT_ALT: return Key::LeftAlt;
         case GLFW_KEY_RIGHT_ALT: return Key::RightAlt;
         case GLFW_KEY_F2: return Key::F2;
+        case GLFW_KEY_F3: return Key::F3;
         default: return Key::Unknown;
     }
 }
@@ -40,12 +41,48 @@ static void glfw_scroll_adapter(GLFWwindow* glfw_win, double x, double y) {
     if (win && win->get_scroll_callback()) win->get_scroll_callback()(win, x, y);
 }
 
+// GLFW (desktop preview build) key -> X11 keysym number, so it shares the key table with the
+// Weston and Xorg windows. Covers letters, digits, space, editing and navigation keys.
+static uint32_t glfw_keysym(int glfw_key, int mods) {
+    bool shift = (mods & GLFW_MOD_SHIFT) != 0;
+    if (glfw_key >= GLFW_KEY_A && glfw_key <= GLFW_KEY_Z) return (shift ? 'A' : 'a') + (glfw_key - GLFW_KEY_A);
+    if (glfw_key >= GLFW_KEY_0 && glfw_key <= GLFW_KEY_9) return '0' + (glfw_key - GLFW_KEY_0);
+    if (glfw_key >= GLFW_KEY_F1 && glfw_key <= GLFW_KEY_F12) return 0xffbe + (glfw_key - GLFW_KEY_F1);
+    switch (glfw_key) {
+        case GLFW_KEY_SPACE: return ' ';
+        case GLFW_KEY_ENTER: return 0xff0d;
+        case GLFW_KEY_ESCAPE: return 0xff1b;
+        case GLFW_KEY_BACKSPACE: return 0xff08;
+        case GLFW_KEY_TAB: return 0xff09;
+        case GLFW_KEY_DELETE: return 0xffff;
+        case GLFW_KEY_INSERT: return 0xff63;
+        case GLFW_KEY_HOME: return 0xff50;
+        case GLFW_KEY_END: return 0xff57;
+        case GLFW_KEY_PAGE_UP: return 0xff55;
+        case GLFW_KEY_PAGE_DOWN: return 0xff56;
+        case GLFW_KEY_LEFT: return 0xff51;
+        case GLFW_KEY_UP: return 0xff52;
+        case GLFW_KEY_RIGHT: return 0xff53;
+        case GLFW_KEY_DOWN: return 0xff54;
+        case GLFW_KEY_LEFT_SHIFT: return 0xffe1;
+        case GLFW_KEY_RIGHT_SHIFT: return 0xffe2;
+        case GLFW_KEY_LEFT_CONTROL: return 0xffe3;
+        case GLFW_KEY_RIGHT_CONTROL: return 0xffe4;
+        case GLFW_KEY_LEFT_ALT: return 0xffe9;
+        case GLFW_KEY_RIGHT_ALT: return 0xffea;
+        default: return 0;
+    }
+}
+
 static void glfw_key_adapter(GLFWwindow* glfw_win, int key, int scancode, int action, int mods) {
     Window* win = static_cast<Window*>(glfwGetWindowUserPointer(glfw_win));
-    if (win && win->get_key_callback()) {
-        Action a = (action == GLFW_PRESS) ? Action::Press : (action == GLFW_RELEASE) ? Action::Release : Action::Repeat;
-        win->get_key_callback()(win, map_glfw_key(key), scancode, a, mods);
-    }
+    if (!win) return;
+    Action a = (action == GLFW_PRESS) ? Action::Press : (action == GLFW_RELEASE) ? Action::Release : Action::Repeat;
+    int linweb_mods = ((mods & GLFW_MOD_SHIFT) ? ModShift : 0) | ((mods & GLFW_MOD_CONTROL) ? ModControl : 0) |
+                      ((mods & GLFW_MOD_ALT) ? ModAlt : 0) | ((mods & GLFW_MOD_SUPER) ? ModMeta : 0);
+    KeyEvent ev = make_key_event(a, scancode, linweb_mods, glfw_keysym(key, mods), glfw_keysym(key, 0));
+    ev.key = map_glfw_key(key);
+    win->emit_key(ev);
 }
 
 static void glfw_mouse_button_adapter(GLFWwindow* glfw_win, int button, int action, int mods) {

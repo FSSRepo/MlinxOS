@@ -1,6 +1,7 @@
 #include "style/selector_matcher.h"
 #include "parser/css/css_parser.h"
 #include <algorithm>
+#include <sstream>
 
 namespace linweb {
 
@@ -23,6 +24,10 @@ bool SelectorMatcher::matches_pseudo_class(
         return focused_node && focused_node == node;
     } else if (pseudo == "active") {
         return active_node && active_node == node;
+    } else if (pseudo == "root") {
+        // the html element sits under the parser's "root" fragment node (or has no parent at all)
+        auto parent = node->parent.lock();
+        return node->tag_name == "html" && (!parent || parent->tag_name == "root");
     } else if (pseudo == "first-child") {
         auto parent = node->parent.lock();
         if (!parent) return false;
@@ -104,6 +109,30 @@ bool SelectorMatcher::matches_simple_selector(
     }
 
     auto node_classes = target->data.classes();
+    for (const auto& attribute : simple.attributes) {
+        auto found = target->data.attributes.find(attribute.name);
+        if (attribute.name.empty() || found == target->data.attributes.end()) return false;
+        std::string value = found->second, expected = attribute.value;
+        if (attribute.insensitive) {
+            for (char& c : value) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            for (char& c : expected) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        const auto& op = attribute.op;
+        if (op.empty()) continue;
+        if (op == "=") { if (value != expected) return false; }
+        else if (expected.empty()) return false;
+        else if (op == "^=") { if (value.compare(0, expected.size(), expected) != 0) return false; }
+        else if (op == "$=") { if (value.size() < expected.size() || value.compare(value.size() - expected.size(), expected.size(), expected) != 0) return false; }
+        else if (op == "*=") { if (value.find(expected) == std::string::npos) return false; }
+        else if (op == "|=") { if (value != expected && value.compare(0, expected.size() + 1, expected + "-") != 0) return false; }
+        else if (op == "~=") {
+            std::istringstream words(value);
+            std::string word;
+            bool match = false;
+            while (words >> word) if (word == expected) match = true;
+            if (!match) return false;
+        } else return false;
+    }
     for (const auto& cls : simple.classes) {
         if (std::find(node_classes.begin(), node_classes.end(), cls) == node_classes.end()) {
             return false;
@@ -200,6 +229,7 @@ int SelectorMatcher::calculate_specificity(const Selector& selector) {
     for (const auto& part : selector.parts) {
         if (!part.id.empty()) a++;
         b += (int)part.classes.size();
+        b += (int)part.attributes.size();
         b += (int)part.pseudo_classes.size();
         if (!part.tag_name.empty() && part.tag_name != "*") c++;
         if (!part.pseudo_element.empty()) c++;

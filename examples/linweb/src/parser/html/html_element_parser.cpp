@@ -1,12 +1,16 @@
 #include "parser/html/html_element_parser.h"
 #include <cctype>
+#include <algorithm>
+#include "utils/text_encoding.h"
 
 namespace linweb {
 
 std::string parse_tag_name(HTMLTokenizer& t) {
-    return t.consume_while([](char c) { 
+    std::string name = t.consume_while([](char c) {
         return std::isalnum(static_cast<unsigned char>(c)) || c == '-' || c == '_'; 
     });
+    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return name;
 }
 
 std::unordered_map<std::string, std::string> parse_attributes(HTMLTokenizer& t) {
@@ -14,18 +18,25 @@ std::unordered_map<std::string, std::string> parse_attributes(HTMLTokenizer& t) 
     while (true) {
         t.consume_whitespace();
         if (t.pos >= t.input.size()) break;
-        if (t.input[t.pos] == '>') break;
+        if (t.input[t.pos] == '>' || (t.input[t.pos] == '/' && t.pos + 1 < t.input.size() && t.input[t.pos + 1] == '>')) break;
         
-        std::string name = parse_tag_name(t);
+        std::string name = t.consume_while([](char c) { return !std::isspace(static_cast<unsigned char>(c)) && c != '=' && c != '>' && c != '/'; });
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (name.empty()) { ++t.pos; continue; }
         t.consume_whitespace();
         if (t.pos >= t.input.size()) break;
         if (t.input[t.pos] == '=') {
             t.consume_char(); // =
             t.consume_whitespace();
-            char quote = t.consume_char(); // " or '
-            std::string value = t.consume_while([quote](char c) { return c != quote; });
-            t.consume_char(); // quote
-            attrs[name] = value;
+            if (t.pos >= t.input.size()) { attrs.emplace(name, ""); break; }
+            char quote = t.input[t.pos];
+            std::string value;
+            if (quote == '\'' || quote == '"') {
+                ++t.pos;
+                value = t.consume_while([quote](char c) { return c != quote; });
+                if (t.pos < t.input.size()) ++t.pos;
+            } else value = t.consume_while([](char c) { return !std::isspace(static_cast<unsigned char>(c)) && c != '>'; });
+            attrs.emplace(name, decode_html_entities(value));
         } else {
             attrs[name] = "";
         }

@@ -4,7 +4,9 @@
 #include "xdg-shell-client-protocol.h"
 #include <wayland-egl.h>
 #include <EGL/egl.h>
-#include <linux/input-event-codes.h>
+#include <xkbcommon/xkbcommon.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <cstdio>
 #include <cstring>
 #include <chrono>
@@ -36,82 +38,118 @@ struct Window::Impl {
     double cursor_y = 0;
     bool mouse_pressed = false;
     Window* owner = nullptr;
+
+    xkb_context* xkb_ctx = nullptr;
+    xkb_keymap* xkb_map = nullptr;
+    xkb_state* xkb_st = nullptr;
+    DeadKeys dead_keys;
+    int32_t repeat_rate = 25;        // keys per second; wl_keyboard.repeat_info overrides it
+    int32_t repeat_delay = 600;      // ms before the first repeat
+    uint32_t repeat_key = 0;         // evdev code of the key being held (0 = none)
+    std::chrono::steady_clock::time_point next_repeat;
 };
 
-static Key map_linux_key(uint32_t key) {
-    switch (key) {
-        case KEY_ESC: return Key::Escape;
-        case KEY_ENTER: return Key::Enter;
-        case KEY_SPACE: return Key::Space;
-        case KEY_BACKSPACE: return Key::Backspace;
-        case KEY_TAB: return Key::Tab;
-        case KEY_LEFT: return Key::Left;
-        case KEY_UP: return Key::Up;
-        case KEY_RIGHT: return Key::Right;
-        case KEY_DOWN: return Key::Down;
-        case KEY_LEFTSHIFT: return Key::LeftShift;
-        case KEY_RIGHTSHIFT: return Key::RightShift;
-        case KEY_LEFTCTRL: return Key::LeftControl;
-        case KEY_RIGHTCTRL: return Key::RightControl;
-        case KEY_LEFTALT: return Key::LeftAlt;
-        case KEY_RIGHTALT: return Key::RightAlt;
-        case KEY_F2: return Key::F2;
-        case KEY_1: return Key::Num1;
-        case KEY_2: return Key::Num2;
-        case KEY_3: return Key::Num3;
-        case KEY_4: return Key::Num4;
-        case KEY_5: return Key::Num5;
-        case KEY_6: return Key::Num6;
-        case KEY_7: return Key::Num7;
-        case KEY_8: return Key::Num8;
-        case KEY_9: return Key::Num9;
-        case KEY_0: return Key::Num0;
-        case KEY_Q: return Key::Q;
-        case KEY_W: return Key::W;
-        case KEY_E: return Key::E;
-        case KEY_R: return Key::R;
-        case KEY_T: return Key::T;
-        case KEY_Y: return Key::Y;
-        case KEY_U: return Key::U;
-        case KEY_I: return Key::I;
-        case KEY_O: return Key::O;
-        case KEY_P: return Key::P;
-        case KEY_A: return Key::A;
-        case KEY_S: return Key::S;
-        case KEY_D: return Key::D;
-        case KEY_F: return Key::F;
-        case KEY_G: return Key::G;
-        case KEY_H: return Key::H;
-        case KEY_J: return Key::J;
-        case KEY_K: return Key::K;
-        case KEY_L: return Key::L;
-        case KEY_Z: return Key::Z;
-        case KEY_X: return Key::X;
-        case KEY_C: return Key::C;
-        case KEY_V: return Key::V;
-        case KEY_B: return Key::B;
-        case KEY_N: return Key::N;
-        case KEY_M: return Key::M;
-        default: return Key::Unknown;
+// Keyboard: the compositor sends its xkb keymap; xkbcommon turns evdev key codes into
+// symbols with the current modifiers (shift, caps lock, AltGr), so every key of the
+// layout works. Key repeat is done here because Wayland leaves it to the client.
+static void keyboard_keymap(void* data, struct wl_keyboard*, uint32_t format, int fd, uint32_t size) {
+    auto* impl = static_cast<Window::Impl*>(data);
+    if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
+        close(fd);
+        return;
     }
+    void* map = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (map == MAP_FAILED) return;
+    if (!impl->xkb_ctx) impl->xkb_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    xkb_keymap* keymap = xkb_keymap_new_from_string(impl->xkb_ctx, static_cast<const char*>(map),
+                                                    XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    munmap(map, size);
+    if (!keymap) return;
+    xkb_state* state = xkb_state_new(keymap);
+    if (impl->xkb_st) xkb_state_unref(impl->xkb_st);
+    if (impl->xkb_map) xkb_keymap_unref(impl->xkb_map);
+    impl->xkb_map = keymap;
+    impl->xkb_st = state;
+    impl->repeat_key = 0;
 }
 
-static void keyboard_keymap(void*, struct wl_keyboard*, uint32_t, int, uint32_t) {}
 static void keyboard_enter(void*, struct wl_keyboard*, uint32_t, struct wl_surface*, struct wl_array*) {}
-static void keyboard_leave(void*, struct wl_keyboard*, uint32_t, struct wl_surface*) {}
-static void keyboard_modifiers(void*, struct wl_keyboard*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t) {}
-static void keyboard_repeat_info(void*, struct wl_keyboard*, int32_t, int32_t) {}
+
+static void keyboard_leave(void* data, struct wl_keyboard*, uint32_t, struct wl_surface*) {
+    auto* impl = static_cast<Window::Impl*>(data);
+    impl->repeat_key = 0;
+    impl->dead_keys.reset();
+}
+
+static void keyboard_modifiers(void* data, struct wl_keyboard*, uint32_t, uint32_t depressed, uint32_t latched,
+                               uint32_t locked, uint32_t group) {
+    auto* impl = static_cast<Window::Impl*>(data);
+    if (impl->xkb_st) xkb_state_update_mask(impl->xkb_st, depressed, latched, locked, 0, 0, group);
+}
+
+static void keyboard_repeat_info(void* data, struct wl_keyboard*, int32_t rate, int32_t delay) {
+    auto* impl = static_cast<Window::Impl*>(data);
+    impl->repeat_rate = rate;
+    impl->repeat_delay = delay;
+}
+
+static int current_mods(Window::Impl* impl) {
+    auto active = [&](const char* name) {
+        return xkb_state_mod_name_is_active(impl->xkb_st, name, XKB_STATE_MODS_EFFECTIVE) > 0;
+    };
+    int mods = 0;
+    if (active(XKB_MOD_NAME_SHIFT)) mods |= ModShift;
+    if (active(XKB_MOD_NAME_CTRL)) mods |= ModControl;
+    if (active(XKB_MOD_NAME_ALT)) mods |= ModAlt;
+    if (active(XKB_MOD_NAME_LOGO)) mods |= ModMeta;
+    if (active(XKB_MOD_NAME_CAPS)) mods |= ModCapsLock;
+    if (active(XKB_MOD_NAME_NUM)) mods |= ModNumLock;
+    if (active("Mod5")) mods |= ModAltGraph;
+    return mods;
+}
+
+// Builds the event for an evdev key code and delivers it.
+static void deliver_key(Window::Impl* impl, uint32_t evdev, Action action) {
+    if (!impl->xkb_st || !impl->owner) return;
+    xkb_keycode_t keycode = evdev + 8;
+    xkb_keysym_t sym = xkb_state_key_get_one_sym(impl->xkb_st, keycode);
+    xkb_keysym_t base = sym;
+    xkb_layout_index_t layout = xkb_state_key_get_layout(impl->xkb_st, keycode);
+    const xkb_keysym_t* syms = nullptr;
+    if (xkb_keymap_key_get_syms_by_level(impl->xkb_map, keycode, layout, 0, &syms) > 0 && syms) base = syms[0];
+    KeyEvent ev = make_key_event(action, static_cast<int>(evdev), current_mods(impl), sym, base);
+    if (action != Action::Release) impl->dead_keys.process(sym, ev);
+    // Ctrl+Q closes the application (Escape is left to the page, for dialogs and "back").
+    if (action == Action::Press && (ev.mods & ModControl) && (sym == 'q' || sym == 'Q')) impl->should_close = true;
+    impl->owner->emit_key(ev);
+}
 
 static void keyboard_key(void* data, struct wl_keyboard*, uint32_t, uint32_t, uint32_t key, uint32_t state) {
     auto* impl = static_cast<Window::Impl*>(data);
-    Key mapped = map_linux_key(key);
-    Action action = (state == WL_KEYBOARD_KEY_STATE_PRESSED) ? Action::Press : Action::Release;
-    if (mapped == Key::Escape && state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-        impl->should_close = true;
+    if (!impl->xkb_st) return;
+    bool pressed = state == WL_KEYBOARD_KEY_STATE_PRESSED;
+    deliver_key(impl, key, pressed ? Action::Press : Action::Release);
+    if (pressed) {
+        if (impl->repeat_rate > 0 && xkb_keymap_key_repeats(impl->xkb_map, key + 8)) {
+            impl->repeat_key = key;
+            impl->next_repeat = std::chrono::steady_clock::now() + std::chrono::milliseconds(impl->repeat_delay);
+        }
+    } else if (impl->repeat_key == key) {
+        impl->repeat_key = 0;
     }
-    if (impl->owner && impl->owner->get_key_callback()) {
-        impl->owner->get_key_callback()(impl->owner, mapped, 0, action, 0);
+}
+
+// Called every frame: sends the Repeat events of a key that is being held down.
+static void keyboard_repeat_tick(Window::Impl* impl) {
+    if (!impl->repeat_key || impl->repeat_rate <= 0) return;
+    auto now = std::chrono::steady_clock::now();
+    auto period = std::chrono::milliseconds(1000 / impl->repeat_rate);
+    for (int i = 0; i < 4 && impl->repeat_key && now >= impl->next_repeat; ++i) {
+        impl->next_repeat += period;
+        deliver_key(impl, impl->repeat_key, Action::Repeat);
     }
+    if (now >= impl->next_repeat) impl->next_repeat = now + period;   // fell behind: do not burst
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
@@ -322,6 +360,9 @@ void Window::shutdown() {
         wl_keyboard_destroy(impl_->keyboard);
         impl_->keyboard = nullptr;
     }
+    if (impl_->xkb_st) { xkb_state_unref(impl_->xkb_st); impl_->xkb_st = nullptr; }
+    if (impl_->xkb_map) { xkb_keymap_unref(impl_->xkb_map); impl_->xkb_map = nullptr; }
+    if (impl_->xkb_ctx) { xkb_context_unref(impl_->xkb_ctx); impl_->xkb_ctx = nullptr; }
     if (impl_->seat) {
         wl_seat_destroy(impl_->seat);
         impl_->seat = nullptr;
@@ -355,6 +396,7 @@ void Window::swap_buffers() const {
 void Window::poll_events() const {
     Window* self = const_cast<Window*>(this);
     wl_display_dispatch_pending(impl_->display);
+    keyboard_repeat_tick(impl_);
     wl_display_flush(impl_->display);
     if (impl_->current_width != static_cast<uint32_t>(width_) ||
         impl_->current_height != static_cast<uint32_t>(height_)) {

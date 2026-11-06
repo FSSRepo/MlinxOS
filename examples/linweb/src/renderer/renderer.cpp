@@ -1,14 +1,47 @@
+#include "renderer/custom_font.h"
 #include "renderer/renderer.h"
+#include "utils/control_label.h"
+#include "utils/file_utils.h"
+#include "utils/text_transform.h"
 #include "renderer/renderer_internal.h"
 #include "renderer/matrix_math.h"
 #include "renderer/texture_manager.h"
 #include "renderer/svg_loader.h"
 #include "renderer/scrollbar.h"
+#include "renderer/form_renderer.h"
+#include "renderer/video_surface.h"
+#include "renderer/background_renderer.h"
+#include "renderer/mask_renderer.h"
 #include "style/colors.h"
 #include <algorithm>
 #include <sstream>
 
 namespace linweb {
+
+// Draws a text run with CSS letter-spacing: each character sits after the width of the ones before it plus the spacing.
+// Without spacing it is the plain draw_text call.
+static void draw_text_spaced(const std::string& text, float x, float y, float size, float r, float g, float b, float a,
+                             bool bold, float blur, float invert, bool mono, const CustomFont* custom, float spacing)
+{
+    if (spacing == 0.0f || text.empty()) {
+        Renderer::draw_text(text, x, y, size, r, g, b, a, bold, blur, invert, mono, custom);
+        return;
+    }
+    size_t index = 0;
+    for (size_t i = 0; i < text.size();) {
+        size_t len = 1;
+        while (i + len < text.size() && (static_cast<unsigned char>(text[i + len]) & 0xC0) == 0x80) ++len;
+        float offset = Renderer::measure_text(text.substr(0, i), size, bold, mono, custom) + spacing * static_cast<float>(index);
+        Renderer::draw_text(text.substr(i, len), x + offset, y, size, r, g, b, a, bold, blur, invert, mono, custom);
+        i += len;
+        ++index;
+    }
+}
+
+    static bool is_shader_background(const std::string &value)
+    {
+        return trim(value) == "ps3-xmb";
+    }
 
     void parse_color(const std::string &value, float &r, float &g, float &b, float &a)
     {
@@ -97,11 +130,10 @@ namespace linweb {
             size_t end_pos = processed.find(")", rgba_pos);
             if (end_pos != std::string::npos)
             {
-                for (size_t i = rgba_pos; i < end_pos; ++i)
-                {
-                    if (processed[i] == ' ')
-                        processed[i] = ',';
-                }
+                // Keep comma-separated color components together without
+                // introducing extra commas in rgba(0, 0, 0, 0.5).
+                processed.erase(std::remove_if(processed.begin() + rgba_pos, processed.begin() + end_pos,
+                    [](unsigned char c) { return std::isspace(c); }), processed.begin() + end_pos);
             }
         }
 
@@ -217,8 +249,14 @@ namespace linweb {
                 break;
 
             std::string func_name = trim(s.substr(pos, open_paren - pos));
-            size_t close_paren = s.find(')', open_paren);
-            if (close_paren == std::string::npos)
+            // the matching parenthesis: drop-shadow(0 0 6px rgba(255, 255, 255, 0.5)) holds another pair inside
+            size_t close_paren = open_paren;
+            for (int depth = 0; close_paren < s.length(); ++close_paren)
+            {
+                if (s[close_paren] == '(') ++depth;
+                else if (s[close_paren] == ')' && --depth == 0) break;
+            }
+            if (close_paren >= s.length())
                 break;
 
             std::string args = s.substr(open_paren + 1, close_paren - open_paren - 1);
@@ -305,10 +343,10 @@ namespace linweb {
                     }
                     else if (parts[0].find("to ") == 0)
                     {
-                        if (parts[0].find("right") != std::string::npos) grad.angle = 0;
-                        else if (parts[0].find("bottom") != std::string::npos) grad.angle = 90;
-                        else if (parts[0].find("left") != std::string::npos) grad.angle = 180;
-                        else if (parts[0].find("top") != std::string::npos) grad.angle = 270;
+                        if (parts[0].find("right") != std::string::npos) grad.angle = 90;
+                        else if (parts[0].find("bottom") != std::string::npos) grad.angle = 180;
+                        else if (parts[0].find("left") != std::string::npos) grad.angle = 270;
+                        else if (parts[0].find("top") != std::string::npos) grad.angle = 0;
                         color_start_idx = 1;
                     }
 
@@ -375,6 +413,17 @@ namespace linweb {
                 }
                 parts.push_back(trim(inner.substr(last_pos)));
 
+                // A leading shape/size/position ("85% 80% at 34% 11%", "circle", "closest-side") is not a color stop.
+                // The colors and stops that follow are what the gradient paints.
+                if (!parts.empty()) {
+                    const std::string& first = parts[0];
+                    bool geometry = first.find(" at ") != std::string::npos || first.rfind("at ", 0) == 0 ||
+                        (!first.empty() && (std::isdigit(static_cast<unsigned char>(first[0])) || first[0] == '.' || first[0] == '-')) ||
+                        first.rfind("circle", 0) == 0 || first.rfind("ellipse", 0) == 0 ||
+                        first.rfind("closest-", 0) == 0 || first.rfind("farthest-", 0) == 0;
+                    if (geometry) parts.erase(parts.begin());
+                }
+
                 if (parts.size() >= 2)
                 {
                     std::vector<Color> colors;
@@ -422,6 +471,13 @@ namespace linweb {
                 html_bg = root->styled_node->value("background");
             bool html_has_bg = !html_bg.empty() && html_bg != "transparent";
 
+            if (is_shader_background(html_bg))
+            {
+                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT);
+                has_canvas_bg = true;
+            }
+
             if (!html_has_bg)
             {
                 for (const auto &child : root->children)
@@ -435,24 +491,33 @@ namespace linweb {
                             body_bg = child->styled_node->value("background");
                         if (!body_bg.empty() && body_bg != "transparent")
                         {
-                            Gradient body_grad = parse_gradient(body_bg);
-                            if (body_grad.type != GradientType::None)
+                            if (is_shader_background(body_bg))
                             {
-                                // Body has a gradient; let render_box draw it.
-                                // Clear with a neutral color so areas outside the body
-                                // don't show garbage.
-                                glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
                                 glClear(GL_COLOR_BUFFER_BIT);
                                 has_canvas_bg = true;
                             }
                             else
                             {
-                                Color c = parse_color_str(body_bg);
-                                canvas_r = c.r; canvas_g = c.g; canvas_b = c.b; canvas_a = c.a;
-                                has_canvas_bg = true;
-                                // Clear with body's background color
-                                glClearColor(canvas_r, canvas_g, canvas_b, canvas_a);
-                                glClear(GL_COLOR_BUFFER_BIT);
+                                Gradient body_grad = parse_gradient(body_bg);
+                                if (body_grad.type != GradientType::None)
+                                {
+                                    // Body has a gradient; let render_box draw it.
+                                    // Clear with a neutral color so areas outside the body
+                                    // don't show garbage.
+                                    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                                    glClear(GL_COLOR_BUFFER_BIT);
+                                    has_canvas_bg = true;
+                                }
+                                else
+                                {
+                                    Color c = parse_color_str(body_bg);
+                                    canvas_r = c.r; canvas_g = c.g; canvas_b = c.b; canvas_a = c.a;
+                                    has_canvas_bg = true;
+                                    // Clear with body's background color
+                                    glClearColor(canvas_r, canvas_g, canvas_b, canvas_a);
+                                    glClear(GL_COLOR_BUFFER_BIT);
+                                }
                             }
                         }
                         break;
@@ -468,12 +533,14 @@ namespace linweb {
         }
 
         render_box(root, 1.0f, Filter());
+        draw_form_overlays(root);
     }
 
     void Renderer::render_box(const std::shared_ptr<LayoutBox> &box, float inherited_opacity, const Filter &inherited_filter)
     {
         if (!box || !box->styled_node || !box->styled_node->node)
             return;
+        if (box->styled_node->value("visibility") == "hidden" || box->styled_node->value("visibility") == "collapse") return;
 
         if (box->styled_node->node->type() == NodeType::Element && box->styled_node->node->tag_name == "br")
             return;
@@ -572,6 +639,7 @@ namespace linweb {
             float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
             std::string bg_color_val = box->styled_node->value("background-color");
             std::string bg_val = box->styled_node->value("background");
+            bool shader_background = is_shader_background(bg_val) || is_shader_background(bg_color_val);
             
             if (!bg_color_val.empty()) {
                 parse_color(bg_color_val, r, g, b, a);
@@ -649,19 +717,24 @@ namespace linweb {
                     float sw = full_bg_w + shadow.spread * 2.0f;
                     float sh = full_bg_h + shadow.spread * 2.0f;
 
-                    draw_rect(sx, sy, sw, sh, shadow.r, shadow.g, shadow.b, shadow.a * total_opacity, radius + shadow.spread, shadow.blur + combined_filter.blur, combined_filter.invert, Gradient());
+                    draw_rect(sx, sy, sw, sh, shadow.r, shadow.g, shadow.b, shadow.a * total_opacity, radius + shadow.spread, shadow.blur + combined_filter.blur, combined_filter.invert, Gradient(), 0.0f, true);
                 }
 
                 bool is_image_or_svg = (box->styled_node->node->tag_name == "img" || box->styled_node->node->tag_name == "svg");
 
-                if (combined_filter.hasDropShadow && !is_image_or_svg)
+                if (combined_filter.hasDropShadow && !is_image_or_svg && a > 0.0f)
                 {
                     float sx = full_bg_x + combined_filter.dropShadow.offsetX - combined_filter.dropShadow.spread;
                     float sy = full_bg_y + combined_filter.dropShadow.offsetY - combined_filter.dropShadow.spread;
                     float sw = full_bg_w + combined_filter.dropShadow.spread * 2.0f;
                     float sh = full_bg_h + combined_filter.dropShadow.spread * 2.0f;
 
-                    draw_rect(sx, sy, sw, sh, combined_filter.dropShadow.r, combined_filter.dropShadow.g, combined_filter.dropShadow.b, combined_filter.dropShadow.a * total_opacity, radius + combined_filter.dropShadow.spread, combined_filter.dropShadow.blur + combined_filter.blur, combined_filter.invert, Gradient());
+                    draw_rect(sx, sy, sw, sh, combined_filter.dropShadow.r, combined_filter.dropShadow.g, combined_filter.dropShadow.b, combined_filter.dropShadow.a * a, radius + combined_filter.dropShadow.spread, combined_filter.dropShadow.blur + combined_filter.blur, combined_filter.invert, Gradient(), 0.0f, true);
+                }
+
+                if (shader_background)
+                {
+                    draw_ps3_background(bg_x, bg_y, bg_w, bg_h);
                 }
 
                 bool has_border = border_top > 0 || border_bottom > 0 || border_left > 0 || border_right > 0;
@@ -723,8 +796,9 @@ namespace linweb {
                     }
                 }
 
+                draw_background_image(*box, {bg_x, bg_y, bg_w, bg_h}, total_opacity);
                 if (box->styled_node->node->tag_name == "img" || box->styled_node->node->tag_name == "svg") {
-                    std::string src = box->styled_node->node->data.src();
+                    std::string src = resolve_image_src(box->styled_node->node->data.src());
                     Texture tex;
                     
                     int svg_width = static_cast<int>(box->dimensions.content.width);
@@ -732,7 +806,9 @@ namespace linweb {
                     if (svg_width <= 0) svg_width = 100;
                     if (svg_height <= 0) svg_height = 100;
                     
-                    std::string svg_color = box->styled_node->value("color");
+                    // fill (inherited, currentColor already resolved) paints the icon; color is the fallback
+                    std::string svg_color = box->styled_node->value("fill");
+                    if (svg_color.empty() || svg_color == "none") svg_color = box->styled_node->value("color");
                     if (svg_color.empty()) svg_color = "black";
 
                     if (box->styled_node->node->tag_name == "svg") {
@@ -753,12 +829,41 @@ namespace linweb {
                                        combined_filter.dropShadow.r, combined_filter.dropShadow.g, combined_filter.dropShadow.b,
                                        combined_filter.dropShadow.a * total_opacity,
                                        combined_filter.dropShadow.offsetX, combined_filter.dropShadow.offsetY,
-                                       combined_filter.dropShadow.blur, tex.width, tex.height);
+                                       combined_filter.dropShadow.blur, tex.width, tex.height, total_opacity);
                         } else {
                             draw_image(tex.id, box->dimensions.content.x, box->dimensions.content.y,
-                                       box->dimensions.content.width, box->dimensions.content.height, radius);
+                                       box->dimensions.content.width, box->dimensions.content.height, radius,
+                                       0, 0, 0, 0, 0, 0, 0, 0, 0, total_opacity);
                         }
                     }
+                }
+
+                if (box->styled_node->node->tag_name == "video") {
+                    // The picture of the video being played, scaled to fit the box (like object-fit: contain);
+                    // the box's own background shows in the bars.
+                    VideoFrameTexture frame = update_video_texture();
+                    const auto& area = box->dimensions.content;
+                    if (frame.id != 0 && frame.width > 0 && frame.height > 0 && area.width > 0 && area.height > 0) {
+                        float scale = std::min(area.width / frame.width, area.height / frame.height);
+                        float draw_w = frame.width * scale;
+                        float draw_h = frame.height * scale;
+                        draw_image(frame.id, area.x + (area.width - draw_w) * 0.5f, area.y + (area.height - draw_h) * 0.5f,
+                                   draw_w, draw_h, radius);
+                    }
+                }
+
+                draw_form_control(box, total_opacity, radius);
+                draw_list_marker(box, total_opacity);
+                if (is_button_input(*box->styled_node->node)) {
+                    float size = LayoutEngine::parse_px(box->styled_node->value("font-size"), 16);
+                    if (size <= 0) size = 13.3f;
+                    std::string label = button_input_label(*box->styled_node->node);
+                    float width = measure_text(label, size);
+                    float cr = 0, cg = 0, cb = 0, ca = 1;
+                    parse_color(box->styled_node->value("color"), cr, cg, cb, ca);
+                    float x = box->dimensions.content.x + std::max(0.0f, (box->dimensions.content.width - width) / 2);
+                    float y = box->dimensions.content.y + std::max(0.0f, (box->dimensions.content.height - get_line_height(size)) / 2) + RendererState::font_ascent_px * size / RendererState::base_font_size;
+                    draw_text(label, x, y, size, cr, cg, cb, ca * total_opacity);
                 }
 
                 if ((!borders_uniform || !all_sides_present) && has_border)
@@ -856,11 +961,12 @@ namespace linweb {
                 font_size = 16.0f;
 
             float scale = font_size / RendererState::base_font_size;
-            float scaled_ascent = RendererState::font_ascent_px * scale;
-            float font_height = RendererState::font_line_height_px * scale;
+            const CustomFont* custom = CustomFonts::select(box->styled_node->value("font-family"), box->styled_node->value("font-weight"), box->styled_node->value("font-style"));
+            float scaled_ascent = Renderer::scaled_ascent(font_size, custom);
+            float font_height = Renderer::get_line_height(font_size, custom);
 
-            float text_line_height = box->line_height > 0.0f ? box->line_height : font_height;
-            float extra_leading = std::max(0.0f, text_line_height - font_height);
+            // a wrapped text is several lines tall: the leading is that of one of them
+            float extra_leading = std::max(0.0f, box->dimensions.content.height / static_cast<float>(std::max(1, box->text_line_count)) - font_height);
             float y_offset = extra_leading / 2.0f;
 
             std::string font_weight = box->styled_node->value("font-weight");
@@ -870,10 +976,41 @@ namespace linweb {
 
             BoxShadow text_shadow = resolve_text_shadow(box);
             if (text_shadow.active) {
-                draw_text(text_node->data, box->dimensions.content.x + text_shadow.offsetX, box->dimensions.content.y + y_offset + scaled_ascent + text_shadow.offsetY, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, text_shadow.blur + combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
+                // The shadow is drawn into its own layer and composed once, so overlapping blurred glyphs do not add up
+                const std::string shadow_text = apply_text_transform(text_node->data, box->styled_node->value("text-transform"));
+                const float spacing = parse_letter_spacing(box->styled_node->value("letter-spacing"));
+                const float spread = text_shadow.blur + combined_filter.blur;
+                const float shadow_x = box->dimensions.content.x - box->text_leading_trim + text_shadow.offsetX;
+                const float shadow_y = box->dimensions.content.y + y_offset + scaled_ascent + text_shadow.offsetY;
+                GLint shadow_previous_framebuffer = 0;
+                if (text_shadow_layer_begin(shadow_previous_framebuffer)) {
+                    // the glyphs go into the layer sharp; the blur is a separable gaussian with sigma = blur / 2 (CSS)
+                    draw_text_spaced(shadow_text, shadow_x, shadow_y, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a, is_bold, 0.0f, combined_filter.invert, is_monospace, custom, spacing);
+                    text_shadow_layer_end(shadow_previous_framebuffer);
+                    const float pad = spread * 1.5f + 4.0f;
+                    const float left = std::min(box->dimensions.content.x - box->text_leading_trim, shadow_x) - pad;
+                    const float top = std::min(box->dimensions.content.y, shadow_y - scaled_ascent) - pad;
+                    const float right = std::max(box->dimensions.content.x - box->text_leading_trim + box->dimensions.content.width, shadow_x + box->dimensions.content.width) + pad;
+                    const float bottom = std::max(box->dimensions.content.y + box->dimensions.content.height, shadow_y + font_height) + pad;
+                    if (spread > 0.0f)
+                        text_shadow_layer_blur_compose(left, top, right - left, bottom - top, spread * 0.5f, total_opacity);
+                    else
+                        text_shadow_layer_compose(left, top, right - left, bottom - top, total_opacity);
+                } else {
+                    draw_text_spaced(shadow_text, shadow_x, shadow_y, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, spread, combined_filter.invert, is_monospace, custom, spacing);
+                }
             }
 
-            draw_text(text_node->data, box->dimensions.content.x, box->dimensions.content.y + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
+            if (box->text_line_count > 1) {
+                // wrapped text: each line from the left edge of the block around it, one line height below the last
+                const std::vector<std::string> lines = box->text_lines();
+                const float row = box->dimensions.content.height / static_cast<float>(lines.size());
+                for (size_t i = 0; i < lines.size(); ++i) {
+                    const float line_x = box->text_line_x(i, box->measure_text_run(lines[i]));
+                    draw_text_spaced(lines[i], line_x, box->dimensions.content.y + row * static_cast<float>(i) + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace, custom, parse_letter_spacing(box->styled_node->value("letter-spacing")));
+                }
+            } else
+            draw_text_spaced(apply_text_transform(text_node->data, box->styled_node->value("text-transform")), box->dimensions.content.x - box->text_leading_trim, box->dimensions.content.y + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace, custom, parse_letter_spacing(box->styled_node->value("letter-spacing")));
             if (debug_type == DebugType::Text)
             {
                 draw_rect(box->dimensions.content.x, box->dimensions.content.y,
@@ -895,11 +1032,14 @@ namespace linweb {
                 font_size = 16.0f;
 
             float scale = font_size / RendererState::base_font_size;
-            float scaled_ascent = RendererState::font_ascent_px * scale;
-            float font_height = RendererState::font_line_height_px * scale;
+            const CustomFont* custom = CustomFonts::select(box->styled_node->value("font-family"), box->styled_node->value("font-weight"), box->styled_node->value("font-style"));
+            float scaled_ascent = Renderer::scaled_ascent(font_size, custom);
+            float font_height = Renderer::get_line_height(font_size, custom);
 
-            float text_line_height = box->line_height > 0.0f ? box->line_height : font_height;
-            float extra_leading = std::max(0.0f, text_line_height - font_height);
+            // generated text wraps like any other: one entry per line, each with its own start
+            std::vector<std::string> pseudo_lines = box->text_line_count > 1 ? box->text_lines() : std::vector<std::string>{pseudo_node->pseudo_content};
+            float row_height = box->dimensions.content.height / static_cast<float>(pseudo_lines.size());
+            float extra_leading = std::max(0.0f, row_height - font_height);
             float y_offset = extra_leading / 2.0f;
 
             std::string font_weight = box->styled_node->value("font-weight");
@@ -908,11 +1048,14 @@ namespace linweb {
             bool is_monospace = (font_family == "monospace");
 
             BoxShadow text_shadow = resolve_text_shadow(box);
-            if (text_shadow.active) {
-                draw_text(pseudo_node->pseudo_content, box->dimensions.content.x + text_shadow.offsetX, box->dimensions.content.y + y_offset + scaled_ascent + text_shadow.offsetY, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, text_shadow.blur + combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
+            for (size_t i = 0; i < pseudo_lines.size(); ++i) {
+                const float line_x = pseudo_lines.size() > 1 ? box->text_line_x(i, box->measure_text_run(pseudo_lines[i])) : box->dimensions.content.x;
+                const float line_y = box->dimensions.content.y + row_height * static_cast<float>(i) + y_offset + scaled_ascent;
+                if (text_shadow.active) {
+                    draw_text(pseudo_lines[i], line_x + text_shadow.offsetX, line_y + text_shadow.offsetY, font_size, text_shadow.r, text_shadow.g, text_shadow.b, text_shadow.a * total_opacity, is_bold, text_shadow.blur + combined_filter.blur, combined_filter.invert, is_monospace, custom);
+                }
+                draw_text(pseudo_lines[i], line_x, line_y, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace, custom);
             }
-
-            draw_text(pseudo_node->pseudo_content, box->dimensions.content.x, box->dimensions.content.y + y_offset + scaled_ascent, font_size, r, g, b, a * total_opacity, is_bold, combined_filter.blur, combined_filter.invert, is_monospace, text_line_height);
         }
 
         auto model_with_scroll = RendererState::current_model;
@@ -928,9 +1071,30 @@ namespace linweb {
             [](const auto& a, const auto& b) {
                 return a->z_index < b->z_index;
             });
-        for (const auto &child : sorted_children)
+
+        // mask-image with a linear gradient: the children are drawn into a layer, then faded over the padding box
+        std::vector<MaskStop> mask_stops;
+        bool mask_reversed = false;
+        std::string mask_value = box->styled_node->value("mask-image");
+        if (mask_value.empty()) mask_value = box->styled_node->value("-webkit-mask-image");
+        bool masked = needs_clipping && parse_mask_gradient(mask_value, clip_h, mask_stops, mask_reversed);
+        GLint mask_previous_framebuffer = 0;
+        if (masked && mask_layer_begin(mask_previous_framebuffer))
         {
-            render_box(child, total_opacity, combined_filter);
+            for (const auto &child : sorted_children)
+            {
+                render_box(child, total_opacity, combined_filter);
+            }
+            mask_layer_end(mask_previous_framebuffer);
+            RendererState::current_model = original_model;
+            mask_layer_compose(clip_x, clip_y, clip_w, clip_h, mask_stops, mask_reversed);
+        }
+        else
+        {
+            for (const auto &child : sorted_children)
+            {
+                render_box(child, total_opacity, combined_filter);
+            }
         }
         RendererState::current_model = original_model;
 
@@ -946,7 +1110,8 @@ namespace linweb {
             }
         }
 
-        if (needs_clipping && overflow != "hidden" && box->total_content_height > clip_h + 1.0f)
+        if (needs_clipping && overflow != "hidden" && box->styled_node->value("scrollbar-width") != "none" &&
+            box->total_content_height > clip_h + 1.0f)
         {
             float scrollable_height = box->total_content_height - box->dimensions.border.top - box->dimensions.border.bottom;
             Scrollbar sb = Scrollbar::from_clip(

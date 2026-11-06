@@ -84,6 +84,24 @@ SimpleSelector parse_simple_selector(CSSTokenizer& t) {
             } else {
                 simple.pseudo_classes.push_back(parse_pseudo_class(t));
             }
+        } else if (c == '[') {
+            t.consume_char();
+            t.consume_whitespace();
+            SimpleSelector::Attribute attribute;
+            attribute.name = t.parse_identifier();
+            t.consume_whitespace();
+            if (t.pos < t.input.size() && t.input[t.pos] != ']') {
+                if (t.input[t.pos] != '=') attribute.op += t.consume_char();
+                if (t.pos < t.input.size() && t.input[t.pos] == '=') attribute.op += t.consume_char();
+                t.consume_whitespace();
+                if (t.pos < t.input.size() && (t.input[t.pos] == '\'' || t.input[t.pos] == '"')) attribute.value = t.parse_string();
+                else attribute.value = t.parse_identifier();
+                t.consume_whitespace();
+                if (t.pos < t.input.size() && (t.input[t.pos] == 'i' || t.input[t.pos] == 'I')) { attribute.insensitive = true; ++t.pos; t.consume_whitespace(); }
+            }
+            if (t.pos < t.input.size() && t.input[t.pos] == ']') ++t.pos;
+            else attribute.name.clear(); // An invalid selector must never match.
+            simple.attributes.push_back(std::move(attribute));
         } else if (c == '*') {
             t.consume_char();
             simple.tag_name = "*";
@@ -105,10 +123,12 @@ Selector parse_selector(CSSTokenizer& t) {
         Combinator comb = parse_combinator(t, !selector.parts.empty());
         if (comb != Combinator::None) {
             selector.combinators.push_back(comb);
+            // "a > b": the explicit combinator can be followed by white space before the next compound selector
+            t.consume_whitespace();
         }
-        
+
         SimpleSelector simple = parse_simple_selector(t);
-        if (simple.tag_name.empty() && simple.id.empty() && simple.classes.empty() && simple.pseudo_classes.empty() && simple.pseudo_element.empty()) {
+        if (simple.tag_name.empty() && simple.id.empty() && simple.classes.empty() && simple.pseudo_classes.empty() && simple.pseudo_element.empty() && simple.attributes.empty()) {
             break;
         }
         selector.parts.push_back(std::move(simple));

@@ -2,6 +2,8 @@
 #include "window.h"
 #include "../utils/layout_traversal.h"
 #include "scripting/js_engine.h"
+#include "forms/form_controls.h"
+#include "utils/log.h"
 
 namespace linweb {
 
@@ -122,12 +124,26 @@ void MouseHandler::handle_hover_and_click(Window* window, JSEngine* js_engine) {
     if (pressed && !state_.pressed) {
         state_.pressed = true;
         state_.had_click_event = true;
+        if (forms::popup_press(state_.px, state_.py)) return;   // a row of an open select list was chosen
         g_active_node = state_.current_hovered_dom_node;
         if (state_.current_hovered_dom_node && state_.current_hovered_dom_node->type() == NodeType::Element) {
-            g_focused_node = state_.current_hovered_dom_node;
+            // a form control takes the press itself (caret, slider); anything else just gets the focus
+            bool handled = false;
+            if (hovered_box) {
+                const auto& area = hovered_box->dimensions.content;
+                float font_size = LayoutEngine::parse_px(hovered_box->styled_node->value("font-size"), 16.0f);
+                handled = forms::mouse_press(state_.current_hovered_dom_node, {area.x, area.y, area.width, area.height},
+                                             font_size > 0 ? font_size : 16.0f, state_.px);
+            }
+            if (!handled) forms::set_focus(state_.current_hovered_dom_node);
+            log_event("click", state_.current_hovered_dom_node->tag_name + " at " + std::to_string(static_cast<int>(state_.px)) +
+                               "," + std::to_string(static_cast<int>(state_.py)));
             dispatch_click_event(js_engine, state_.current_hovered_dom_node);
         }
+    } else if (pressed) {
+        if (forms::dragging()) forms::mouse_drag(state_.px);
     } else if (!pressed) {
+        if (state_.pressed) forms::mouse_release();
         state_.pressed = false;
         g_active_node = nullptr;
     }

@@ -39,7 +39,7 @@ bool FontManager::load_monospace_font(const std::string& path) {
     std::cout << "Monospace font loaded: " << file.gcount() << " bytes." << std::endl;
 
     auto temp_bitmap = std::make_unique<unsigned char[]>(1024 * 1024);
-    stbtt_BakeFontBitmap(RendererState::font_mono_buffer, 0, RendererState::base_font_size, temp_bitmap.get(), 1024, 1024, 32, 96, RendererState::cdata_mono);
+    stbtt_BakeFontBitmap(RendererState::font_mono_buffer, 0, RendererState::base_font_size, temp_bitmap.get(), 1024, 1024, 32, 224, RendererState::cdata_mono);
 
     glGenTextures(1, &RendererState::ftex_mono);
     glBindTexture(GL_TEXTURE_2D, RendererState::ftex_mono);
@@ -72,8 +72,16 @@ bool FontManager::load_font(const std::string& path, bool bold) {
     file.read((char*)buffer, 1 << 20);
     std::cout << (bold ? "Bold" : "Regular") << " font loaded: " << file.gcount() << " bytes." << std::endl;
 
+    // stbtt bakes a pixel height spread over ascent - descent, not over the em. Bake at the height
+    // that makes one em equal base_font_size; otherwise every advance comes out ~10% narrow (Arial: 2288/2048).
+    stbtt_fontinfo bake_info;
+    stbtt_InitFont(&bake_info, buffer, stbtt_GetFontOffsetForIndex(buffer, 0));
+    int bake_ascent = 0, bake_descent = 0, bake_gap = 0;
+    stbtt_GetFontVMetrics(&bake_info, &bake_ascent, &bake_descent, &bake_gap);
+    float bake_height = RendererState::base_font_size * (float)(bake_ascent - bake_descent) * stbtt_ScaleForMappingEmToPixels(&bake_info, 1.0f);
+
     auto temp_bitmap = std::make_unique<unsigned char[]>(1024 * 1024);
-    stbtt_BakeFontBitmap(buffer, 0, RendererState::base_font_size, temp_bitmap.get(), 1024, 1024, 32, 96, cdata);
+    stbtt_BakeFontBitmap(buffer, 0, bake_height, temp_bitmap.get(), 1024, 1024, 32, 224, cdata);
 
     glGenTextures(1, &ftex);
     glBindTexture(GL_TEXTURE_2D, ftex);
@@ -89,8 +97,11 @@ bool FontManager::load_font(const std::string& path, bool bold) {
     if (!bold) {
         int ascent = 0, descent = 0, line_gap = 0;
         stbtt_GetFontVMetrics(&font_info, &ascent, &descent, &line_gap);
-        float scale = stbtt_ScaleForPixelHeight(&font_info, RendererState::base_font_size);
+        // metrics are per em, like the glyph bitmaps baked above; ScaleForPixelHeight would use ascent - descent
+        float scale = stbtt_ScaleForMappingEmToPixels(&font_info, RendererState::base_font_size);
         RendererState::font_ascent_px = (float)ascent * scale;
+        RendererState::font_descent_px = (float)(-descent) * scale;
+        RendererState::font_gap_px = (float)line_gap * scale;
         RendererState::font_line_height_px = (float)(ascent - descent + line_gap) * scale;
         if (!(RendererState::font_line_height_px > 0.0f))
             RendererState::font_line_height_px = 24.0f;

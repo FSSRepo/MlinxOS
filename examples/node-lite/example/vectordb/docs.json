@@ -1,0 +1,22 @@
+[
+  { "id": "linux-boot", "topic": "linux", "text": "The Linux kernel mounts an initramfs, starts init and then launches the system services one by one." },
+  { "id": "linux-grub", "topic": "linux", "text": "GRUB is the bootloader that loads the kernel image and the initial ramdisk from the disk." },
+  { "id": "linux-udev", "topic": "linux", "text": "udev creates the device nodes in /dev and tags input devices so applications can find the keyboard." },
+  { "id": "linux-wifi", "topic": "linux", "text": "wpa_supplicant authenticates against the access point and udhcpc then requests an IP address by DHCP." },
+  { "id": "cook-pasta", "topic": "cooking", "text": "Boil the pasta in salted water, then toss it with fresh tomato sauce, garlic and basil." },
+  { "id": "cook-bread", "topic": "cooking", "text": "Bread dough needs flour, water, salt and yeast, and it rises for an hour before baking in a hot oven." },
+  { "id": "cook-tortilla", "topic": "cooking", "text": "La tortilla de patatas se hace con huevos, patatas fritas lentamente en aceite de oliva y cebolla." },
+  { "id": "cook-soup", "topic": "cooking", "text": "A good vegetable soup simmers carrots, leeks and potatoes in broth with a little pepper." },
+  { "id": "space-mars", "topic": "space", "text": "Mars is a cold desert planet with the tallest volcano in the solar system and two small moons." },
+  { "id": "space-moon", "topic": "space", "text": "La Luna orbita la Tierra cada 27 días y su gravedad provoca las mareas de los océanos." },
+  { "id": "space-bh", "topic": "space", "text": "A black hole is a region where gravity is so strong that not even light can escape from it." },
+  { "id": "space-iss", "topic": "space", "text": "The International Space Station circles the Earth every ninety minutes with astronauts on board." },
+  { "id": "music-rock", "topic": "music", "text": "Rock bands are built around electric guitars, bass and drums with loud, energetic choruses." },
+  { "id": "music-mp3", "topic": "music", "text": "MP3 compresses audio by discarding sounds the human ear is unlikely to notice, frame by frame." },
+  { "id": "music-piano", "topic": "music", "text": "El piano tiene ochenta y ocho teclas y un martillo golpea cada cuerda cuando se pulsa la tecla." },
+  { "id": "sport-football", "topic": "sports", "text": "Football is played by two teams of eleven players who try to score goals with their feet." },
+  { "id": "sport-marathon", "topic": "sports", "text": "A marathon is a running race of 42 kilometres that demands months of endurance training." },
+  { "id": "sport-tennis", "topic": "sports", "text": "Tennis players serve the ball over the net and win points when the opponent cannot return it." },
+  { "id": "money-bank", "topic": "finance", "text": "A savings account pays a small interest while the bank lends your deposits to other customers." },
+  { "id": "money-stocks", "topic": "finance", "text": "Buying stocks means owning a small part of a company, and its price rises and falls with the market." }
+]

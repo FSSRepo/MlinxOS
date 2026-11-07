@@ -1,0 +1,1666 @@
+@font-face {
+    font-family: 'Mulish';
+    src: url('fonts/Mulish/Mulish-Light.ttf');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mulish';
+    src: url('fonts/Mulish/Mulish-Regular.ttf');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mulish';
+    src: url('fonts/Mulish/Mulish-Medium.ttf');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mulish';
+    src: url('fonts/Mulish/Mulish-SemiBold.ttf');
+    font-weight: 600;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mulish';
+    src: url('fonts/Mulish/Mulish-Bold.ttf');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mulish';
+    src: url('fonts/Mulish/Mulish-ExtraBold.ttf');
+    font-weight: 800;
+    font-style: normal;
+}
+
+#browser-preview-label {
+    position: fixed;
+    bottom: 10px;
+    right: 14px;
+    color: rgba(255, 255, 255, 0.65);
+    font: 11px sans-serif;
+    z-index: 9999;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    /* The animated XMB wave shader of the renderer (blue) */
+    background: ps3-xmb;
+    background-attachment: fixed;
+    color: #ffffff;
+    font-family: 'Mulish', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+}
+
+#app {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#xmb-container {
+    position: absolute;
+    top: 30%;
+    left: 0;
+    width: 100%;
+    transform: translateY(-50%);
+}
+
+#main-menu {
+    display: flex;
+    align-items: flex-start;
+    padding-left: 0;
+    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: transform;
+}
+
+.menu-item {
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.4s ease;
+    opacity: 0.4;
+    filter: blur(1px);
+}
+
+.menu-item.active {
+    opacity: 1;
+    filter: blur(0);
+    animation: selectionBlink 1.5s infinite ease-in-out;
+}
+
+@keyframes selectionBlink {
+    0%, 100% { opacity: 1; filter: drop-shadow(0 0 15px rgba(255,255,255,0.6)); }
+    50% { opacity: 0.7; filter: drop-shadow(0 0 5px rgba(255,255,255,0.2)); }
+}
+
+.menu-icon {
+    width: 4rem;
+    height: 4rem;
+    filter: invert(1) drop-shadow(0 0 10px rgba(255,255,255,0.2));
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.menu-item.active .menu-icon {
+    width: 6rem;
+    height: 6rem;
+    filter: invert(1) drop-shadow(0 0 15px rgba(255,255,255,0.5));
+}
+
+.menu-item span {
+    font-size: 1.4rem;
+    opacity: 0;
+    margin-top: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.4s ease;
+    color: rgba(255,255,255,0.9);
+}
+
+.menu-item.active span {
+    opacity: 1;
+}
+
+/* The list scrolls under a fixed window so items never overlap the icon row. */
+#submenu-viewport {
+    position: absolute;
+    left: 338px;
+    right: 40px;
+    top: calc(30% + 125px);
+    bottom: 24px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 48px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 48px), transparent 100%);
+}
+
+#submenu-container {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: transform;
+}
+
+.submenu-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 2rem;
+    font-weight: 300;
+    color: rgba(255,255,255,0.5);
+    transition: color 0.3s ease, text-shadow 0.3s ease, opacity 0.3s ease, font-size 0.3s ease;
+    text-align: left;
+    padding: 5px 20px;
+    border-radius: 5px;
+}
+
+.submenu-item .item-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.submenu-item.active {
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 400;
+    text-shadow: 0 0 15px rgba(255,255,255,0.5);
+    animation: submenuBlink 1.5s infinite ease-in-out;
+}
+
+/* Keep the activated diagnostics item steady; some lightweight renderers
+   incorrectly tint text while interpolating this animation. */
+.submenu-item.debug-open {
+    color: #fff;
+    font-size: 2.5rem;
+    font-weight: 400;
+    text-shadow: none;
+    animation: none;
+}
+
+@keyframes submenuBlink {
+    0%, 100% { opacity: 1; text-shadow: 0 0 15px rgba(255,255,255,0.8); }
+    50% { opacity: 0.6; text-shadow: 0 0 5px rgba(255,255,255,0.2); }
+}
+
+header {
+    position: absolute;
+    top: 54px;
+    right: 60px;
+    text-align: right;
+}
+
+header h1 {
+    font-size: 1.2rem;
+    font-weight: 300;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+#status {
+    position: absolute;
+    bottom: 40px;
+    left: 60px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: left;
+}
+
+#system-info {
+    display: none;
+    position: absolute;
+    left: 338px;
+    top: calc(30% + 125px);
+    right: 40px;
+    bottom: 45px;
+    max-width: 720px;
+    margin: 0;
+    padding: 0;
+    color: #fff;
+    background: transparent;
+    border: 0;
+    font: 16px/1.55 'Segoe UI', sans-serif;
+    white-space: pre-wrap;
+    overflow: auto;
+    z-index: 5;
+    transition: left 0.35s ease, right 0.35s ease, top 0.35s ease, bottom 0.35s ease, padding 0.35s ease,
+        background 0.35s ease;
+}
+
+
+#system-info.visible {
+    display: block;
+}
+
+/* System information on a full screen, like the storage panel: the title is large and the text is easy to read */
+#system-info.fullscreen {
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    max-width: none;
+    padding: 72px 96px;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, rgba(28, 52, 150, 0.96) 0%, rgba(12, 22, 84, 0.98) 100%);
+    font-size: 20px;
+    line-height: 1.7;
+    z-index: 30;
+}
+
+#system-info.fullscreen::first-line {
+    font-size: 40px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+}
+
+/* Storage panel (disk list actions, file browser, confirmations) */
+#storage-panel,
+#music-panel,
+#net-panel,
+#nl-panel,
+#in-panel,
+#vb-panel {
+    display: none;
+    position: absolute;
+    left: 338px;
+    right: 40px;
+    top: calc(30% + 125px);
+    bottom: 45px;
+    max-width: 720px;
+    padding: 0;
+    color: #fff;
+    background: transparent;
+    border: 0;
+    font: 18px/1.45 'Segoe UI', sans-serif;
+    overflow: auto;
+    z-index: 6;
+    /* a long list fades out at the bottom edge, like the column of the XMB (#submenu-viewport) */
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 48px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 48px), transparent 100%);
+    transition: left 0.35s ease, right 0.35s ease, top 0.35s ease, bottom 0.35s ease, padding 0.35s ease,
+        background 0.35s ease;
+}
+
+#storage-panel.visible,
+#music-panel.visible,
+#net-panel.visible,
+#in-panel.visible,
+#nl-panel.visible,
+#vb-panel.visible {
+    display: block;
+}
+
+#sp-title,
+#mp-title,
+#np-title,
+#in-title,
+#nl-title,
+#vb-title {
+    font-size: 24px;
+    font-weight: 300;
+    margin-bottom: 8px;
+}
+
+#sp-subtitle,
+#mp-subtitle,
+#np-subtitle,
+#in-subtitle,
+#nl-subtitle,
+#vb-subtitle {
+    margin: 0 0 12px 0;
+    color: rgba(255, 255, 255, 0.65);
+    font: 14px/1.45 'Segoe UI', sans-serif;
+    white-space: pre-wrap;
+}
+
+.sp-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 5px 0 5px 20px;
+    font-size: 21px;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 0.65);
+    white-space: normal;
+    transition: font-size 0.25s ease, color 0.25s ease, text-shadow 0.25s ease;
+}
+
+.sp-item .item-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sp-item .item-meta {
+    flex: 0 0 auto;
+    margin-left: 24px;
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Pictograms shared by the category column and the option panels. */
+.item-icon {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    filter: invert(1);
+    opacity: 0.55;
+    transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.submenu-item .item-icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+}
+
+.sp-item.active .item-icon,
+.submenu-item.active .item-icon,
+.submenu-item.debug-open .item-icon {
+    opacity: 1;
+    filter: invert(1) drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
+}
+
+.sp-item.active {
+    color: #fff;
+    font-size: 25px;
+    background: transparent;
+    text-shadow: 0 0 12px rgba(255, 255, 255, 0.85);
+}
+
+#storage-panel, #music-panel, #net-panel, #in-panel, #nl-panel, #vb-panel, #system-info {
+    scrollbar-width: none;
+}
+
+#storage-panel::-webkit-scrollbar, #music-panel::-webkit-scrollbar,
+#net-panel::-webkit-scrollbar, #in-panel::-webkit-scrollbar, #nl-panel::-webkit-scrollbar,
+#vb-panel::-webkit-scrollbar, #system-info::-webkit-scrollbar {
+    display: none;
+}
+
+.sp-item.danger.active {
+    color: #ffd2c8;
+    text-shadow: 0 0 12px rgba(255, 120, 100, 0.9);
+}
+
+.xmb-panel-open #submenu-container {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+@media (max-width: 900px) {
+    .submenu-item {
+        font-size: 1.5rem;
+    }
+
+    .submenu-item.active {
+        font-size: 1.8rem;
+    }
+}
+
+@media (max-width: 600px) {
+    #submenu-viewport {
+        left: 24px;
+        right: 24px;
+    }
+
+    #system-info, #storage-panel, #music-panel, #net-panel, #in-panel, #nl-panel, #vb-panel {
+        left: 24px;
+        right: 24px;
+    }
+}
+
+#sp-hint,
+#mp-hint,
+#np-hint,
+#in-hint,
+#nl-hint,
+#vb-hint {
+    margin-top: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+}
+
+/* Status area at the top, as in the XMB: no bar, only a soft shade under the edge. One pictogram with its text per
+   service, and the clock with the date at the right end. It is always on screen (see refreshBadge in network.js). */
+#net-badge {
+    display: flex;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 52px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 26px;
+    padding: 0 40px 6px 40px;
+    color: #fff;
+    background: linear-gradient(180deg, rgba(2, 6, 30, 0.62) 0%, rgba(2, 6, 30, 0) 100%);
+    font: 300 15px/1 'Mulish', 'Segoe UI', sans-serif;
+    z-index: 7;
+}
+
+.nb-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    white-space: nowrap;
+}
+
+.nb-item .item-icon {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    opacity: 0.95;
+    filter: invert(1) drop-shadow(0 0 5px rgba(150, 200, 255, 0.8));
+}
+
+.nb-item.warn .item-icon {
+    filter: invert(1) drop-shadow(0 0 5px rgba(255, 179, 71, 0.9));
+}
+
+.nb-title {
+    font-weight: 400;
+    text-shadow: 0 0 8px rgba(150, 200, 255, 0.4);
+}
+
+.nb-detail {
+    color: rgba(255, 255, 255, 0.62);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Narrow screens: the details (address, time of the track) leave, so the clock always fits */
+@media (max-width: 1100px) {
+    .nb-detail {
+        display: none;
+    }
+}
+
+/* The clock: time large and thin, the date small beside it */
+.nb-clock {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-left: 6px;
+    white-space: nowrap;
+}
+
+.nb-time {
+    font-size: 22px;
+    font-weight: 300;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 10px rgba(150, 200, 255, 0.5);
+}
+
+.nb-date {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.62);
+}
+
+/* Guide of the buttons along the bottom edge: what the pad does here (see #guide in index.html) */
+#guide {
+    position: absolute;
+    right: 60px;
+    bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    font: 300 15px/1 'Mulish', 'Segoe UI', sans-serif;
+    z-index: 5;
+}
+
+.guide-key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 8px rgba(130, 190, 255, 0.35);
+}
+
+.guide-key img {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    filter: invert(1);
+}
+
+.guide-key.pill {
+    width: 44px;                 /* a fixed width: "auto" came out narrower than the text in the engine */
+    flex: 0 0 44px;
+    padding: 0;
+    border-radius: 13px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.guide-text {
+    margin-right: 22px;
+}
+
+#guide-music {
+    display: none;
+    align-items: center;
+    gap: 10px;
+}
+
+#guide-music.visible {
+    display: flex;
+}
+
+/* Video player: the picture fills the window, the controls sit over its bottom edge */
+#vp-screen {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 20;
+}
+
+#vp-screen.visible {
+    display: block;
+}
+
+/* Caption of the simulated picture: the mock paints the slate as a background, the text sits over it */
+#vp-slate {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 58%;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.85);
+    font: 30px/1.5 'Segoe UI', Helvetica, sans-serif;
+    z-index: 20;
+}
+
+#vp-screen.visible + #vp-slate {
+    display: block;
+    animation: vpOpen 0.5s ease-out both;   /* opens with the picture it captions */
+}
+
+#vp-slate-name {
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+#vp-controls {
+    /* always laid out, so hiding it is a fade (opacity) and not a cut (display) */
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    padding: 64px 64px 30px 64px;
+    box-sizing: border-box;
+    color: #fff;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.7) 45%, rgba(0, 0, 0, 0.86) 100%);
+    font: 16px/1.5 'Mulish', 'Segoe UI', sans-serif;
+    z-index: 21;
+}
+
+#vp-controls.visible {
+    opacity: 1;
+}
+
+#vp-info {
+    margin: 0 0 10px 0;
+    font: 16px/1.5 'Mulish', 'Segoe UI', sans-serif;
+    color: rgba(255, 255, 255, 0.78);
+    white-space: pre-wrap;
+}
+
+#vp-info::first-line {
+    font-size: 30px;
+    font-weight: 600;
+    color: #fff;
+}
+
+#vp-help {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+/* Form controls in the panels and the video controls */
+.panel-input {
+    display: none;
+    width: 100%;
+    max-width: 560px;
+    box-sizing: border-box;
+    margin: 14px 0 8px 0;
+    padding: 12px 16px;
+    font: 500 18px/1.4 'Mulish', 'Segoe UI', sans-serif;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    outline: none;
+    accent-color: #4fd1ff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.panel-input.visible {
+    display: inline-block;
+}
+
+.panel-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.04em;
+}
+
+/* Power off: a black screen with the power icon; Enter turns it on again */
+#power-off {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    background: #000;
+    color: rgba(255, 255, 255, 0.85);
+    font: 500 22px/1.4 'Mulish', 'Segoe UI', sans-serif;
+    text-align: center;
+}
+
+#power-off.visible {
+    display: flex;
+    animation: panelFadeIn 0.6s ease-out backwards;
+}
+
+#power-off .po-icon {
+    width: 88px;
+    height: 88px;
+    filter: invert(1);
+    opacity: 0.8;
+}
+
+#power-off .po-hint {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+/* Crossfade between the storage browser and the music player: one fades out while the other fades in */
+@keyframes panelFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes panelFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+#storage-panel.fade-in,
+#music-panel.fade-in,
+#system-info.fade-in {
+    animation: panelFadeIn 0.4s ease-in-out backwards;
+}
+
+#storage-panel.fade-out,
+#music-panel.fade-out,
+#system-info.fade-out {
+    animation: panelFadeOut 0.3s ease-in forwards;
+}
+
+#music-panel.fade-wait {
+    opacity: 0;
+}
+
+/* Network and Node Lite panels open with the video player's zoom and fade */
+#net-panel.zoom-in,
+#in-panel.zoom-in,
+#nl-panel.zoom-in {
+    animation: vpOpen 0.5s ease-out both;
+}
+
+/* The video picture takes the same crossfade; the longer selector wins over the zoom used when it opens alone */
+#vp-screen.visible.fade-in {
+    animation: panelFadeIn 0.3s ease-out backwards;
+}
+
+#vp-screen.visible.fade-out {
+    animation: panelFadeOut 0.3s ease-in forwards;
+}
+
+/* Toast: a notice of the XMB. A translucent bar that fades out to the left, flush with the right edge, under the
+   clock; a white pictogram, a thin title and a dimmer line of text. It slides in from the right and leaves by itself
+   (see xmbToast in xmb-view.js). */
+#toast {
+    position: fixed;
+    right: 0;
+    top: 84px;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 460px;
+    max-width: 100vw;
+    padding: 12px 56px 12px 90px;
+    box-sizing: border-box;
+    color: #fff;
+    background: linear-gradient(90deg, rgba(10, 18, 70, 0) 0%, rgba(10, 18, 70, 0.7) 32%, rgba(10, 18, 70, 0.86) 100%);
+    font: 300 14px/1.4 'Mulish', 'Segoe UI', sans-serif;
+    opacity: 0;
+    translate: 90px 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease, translate 0.4s ease;
+}
+
+#toast.show {
+    opacity: 1;
+    translate: none;
+}
+
+/* The pictogram of the row icons, brighter: white with a glow (orange when it is a warning). Its own opacity wins
+   over the one of the toast (opacity is inherited as a value), so it is shown and hidden with the .show class */
+#toast .item-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    opacity: 0;
+    filter: invert(1) drop-shadow(0 0 6px rgba(255, 255, 255, 0.55));
+}
+
+#toast.show .item-icon {
+    opacity: 1;
+}
+
+#toast.warn .item-icon {
+    filter: invert(1) drop-shadow(0 0 6px rgba(255, 179, 71, 0.8));
+}
+
+#toast .toast-content {
+    min-width: 0;
+}
+
+#toast .toast-title {
+    font-size: 20px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+}
+
+#toast .toast-text {
+    margin-top: 2px;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+    white-space: pre-line;
+}
+
+/* On-screen keyboard under the password field: the arrow keys move the highlight, Enter presses the key */
+.osk {
+    display: none;
+    width: 100%;
+    max-width: 560px;
+    box-sizing: border-box;
+    margin: 6px 0 0 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(8, 18, 24, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.osk.visible {
+    display: block;
+}
+
+.osk-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.osk-row:last-child {
+    margin-bottom: 0;
+}
+
+.osk-key {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    font: 500 16px/1 'Mulish', 'Segoe UI', sans-serif;
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.osk-key.wide {
+    flex: 2.5 1 0;
+}
+
+.osk-key.on {
+    color: #06204d;
+    background: #4fd1ff;
+    border-color: #4fd1ff;
+}
+
+.osk-key.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.4);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25), 0 0 16px rgba(255, 255, 255, 0.55);
+}
+
+.osk-key.active.on {
+    color: #06204d;
+    background: #b0ecff;
+}
+
+/* Focus: a brighter border and a soft glow, in place of the browser's default ring */
+.panel-input:focus {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.22), 0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+.panel-progress {
+    display: none;
+    width: 100%;
+    height: 6px;
+    margin: 2px 0 12px 0;
+    border: 0;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.22);
+    accent-color: #ffffff;
+    overflow: hidden;
+}
+
+#mp-progress {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#mp-progress::-webkit-progress-bar {
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 3px;
+}
+
+#mp-progress::-webkit-progress-value {
+    background: #ffffff;
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.75);
+}
+
+#mp-progress::-moz-progress-bar {
+    background: #ffffff;
+    border-radius: 3px;
+}
+
+.panel-progress.visible {
+    display: block;
+}
+
+#vp-seekrow {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin: 4px 0 8px 0;
+}
+
+#vp-time,
+#vp-duration {
+    width: 72px;
+    font: 500 16px/1.5 'Mulish', 'Segoe UI', sans-serif;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#vp-duration {
+    text-align: right;
+}
+
+#vp-seek {
+    flex-grow: 1;
+    height: 22px;
+    accent-color: #4fd1ff;
+    track-color: rgba(255, 255, 255, 0.3);
+}
+
+#vp-bottom {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+#vp-help {
+    flex-grow: 1;
+}
+
+#vp-volume-label {
+    margin: 0 10px 0 24px;
+    font: 500 14px/1.5 'Mulish', 'Segoe UI', sans-serif;
+    color: rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+}
+
+#vp-volume {
+    width: 120px;
+    height: 14px;
+    accent-color: #4fd1ff;
+    track-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Transitions and animations: the video player opens with a zoom and fade, its controls rise into place,
+   and the music player fills the screen. Option rows have no entrance animation: they are rebuilt or
+   re-classed on every key press, so a slide would replay each time the selection moves. */
+@keyframes vpOpen {
+    from { opacity: 0; transform: scale(1.06); }
+    to { opacity: 1; transform: none; }
+}
+
+@keyframes vpSlideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* These use the individual "translate" property, not "transform": the submenu column scrolls with
+   transform from JS, and an animation on transform would move it back to its unscrolled place. */
+@keyframes listSlideBack {
+    from { opacity: 0; translate: -48px 0; }
+    to { opacity: 1; translate: none; }
+}
+
+@keyframes listSlideForward {
+    from { opacity: 0; translate: 48px 0; }
+    to { opacity: 1; translate: none; }
+}
+
+.slide-back {
+    animation: listSlideBack 0.35s ease-out both;
+}
+
+.slide-forward {
+    animation: listSlideForward 0.35s ease-out both;
+}
+
+/* Choosing an option sends the column out to the left; it stays hidden until the category is reopened */
+@keyframes listSlideOutLeft {
+    from { opacity: 1; translate: none; }
+    to { opacity: 0; translate: -48px 0; }
+}
+
+.slide-out-left {
+    animation: listSlideOutLeft 0.3s ease-in forwards;
+}
+
+/* Reverse of slide-out-left: enters from the left. "backwards" leaves the final transform free for JS. */
+@keyframes listSlideInLeft {
+    from { opacity: 0; translate: -48px 0; }
+    to { opacity: 1; translate: none; }
+}
+
+.slide-in-left {
+    animation: listSlideInLeft 0.3s ease-out backwards;
+}
+
+#vp-screen.visible {
+    animation: vpOpen 0.5s ease-out both;
+}
+
+#vp-controls.visible {
+    animation: vpSlideUp 0.45s ease-out 0.15s both;
+}
+
+#music-panel.fullscreen,
+#storage-panel.fullscreen,
+#net-panel.fullscreen,
+#in-panel.fullscreen {
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    max-width: none;
+    padding: 72px 96px;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, rgba(28, 52, 150, 0.96) 0%, rgba(12, 22, 84, 0.98) 100%);
+    font-size: 22px;
+    z-index: 30;
+}
+
+/* Storage on a full screen: the same large title and rows as the music player */
+#storage-panel.fullscreen #sp-title {
+    font-size: 40px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    margin-bottom: 20px;
+}
+
+#storage-panel.fullscreen #sp-subtitle {
+    font-size: 17px;
+    line-height: 1.6;
+    margin-bottom: 24px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#storage-panel.fullscreen .sp-item {
+    font-size: 26px;
+    padding: 8px 0 8px 20px;
+}
+
+#storage-panel.fullscreen .sp-item.active {
+    font-size: 30px;
+}
+
+#storage-panel.fullscreen #sp-hint {
+    position: absolute;
+    left: 96px;
+    bottom: 36px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    letter-spacing: 0.02em;
+}
+
+/* The music player reads as a now-playing screen: large title, track name, a thick progress bar, bigger rows */
+#music-panel.fullscreen #mp-title {
+    font-size: 40px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    margin-bottom: 20px;
+}
+
+#music-panel.fullscreen #mp-subtitle {
+    font-size: 17px;
+    line-height: 1.6;
+    margin-bottom: 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+#music-panel.fullscreen #mp-subtitle::first-line {
+    font-size: 26px;
+    font-weight: 600;
+    color: #fff;
+}
+
+#music-panel.fullscreen #mp-progress {
+    height: 10px;
+    margin: 22px 0 34px 0;
+}
+
+#music-panel.fullscreen .sp-item {
+    font-size: 26px;
+    padding: 8px 0 8px 20px;
+}
+
+#music-panel.fullscreen .sp-item.active {
+    font-size: 30px;
+}
+
+#music-panel.fullscreen #mp-hint {
+    position: absolute;
+    left: 96px;
+    bottom: 36px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    letter-spacing: 0.02em;
+}
+
+
+/* Music player, now playing: the "ring" shader of the renderer fills the screen (navy blue, it follows the music) and
+   the title and the controls sit on a band at the bottom. The browser (folders and files)
+   keeps the column of the XMB; the player is the .player-mode of the panel (see render() in music.js). */
+#mp-player {
+    display: none;
+}
+
+#music-panel.player-mode #mp-title,
+#music-panel.player-mode #mp-subtitle,
+#music-panel.player-mode #mp-list,
+#music-panel.player-mode #mp-progress {
+    display: none;
+}
+
+#music-panel.fullscreen.player-mode {
+    background: ring;
+    padding: 0;
+    overflow: hidden;
+    -webkit-mask-image: none;
+    mask-image: none;
+}
+
+#music-panel.player-mode #mp-player {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+#mp-eyebrow {
+    position: absolute;
+    left: 40px;
+    top: 30px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    color: rgba(150, 205, 255, 0.9);
+}
+
+#mp-next {
+    position: absolute;
+    right: 40px;
+    top: 28px;
+    max-width: 42%;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#mp-info {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 36px 10% 26px 10%;
+    box-sizing: border-box;
+    text-align: center;
+    background: linear-gradient(180deg, rgba(2, 6, 28, 0) 0%, rgba(2, 6, 28, 0.82) 34%, rgba(2, 6, 28, 0.94) 100%);
+}
+
+#mp-track {
+    font-size: 32px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    color: #fff;
+    text-shadow: 0 0 14px rgba(110, 180, 255, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#mp-album {
+    margin-top: 2px;
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.62);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#mp-timeline {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 14px 0 12px 0;
+}
+
+#mp-pos,
+#mp-dur {
+    flex: 0 0 48px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+#mp-pos {
+    text-align: right;
+}
+
+#mp-dur {
+    text-align: left;
+}
+
+#mp-bar,
+#mp-vol-bar {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 6px;
+    border: 0;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+}
+
+#mp-bar::-webkit-progress-bar,
+#mp-vol-bar::-webkit-progress-bar {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+#mp-bar::-webkit-progress-value,
+#mp-vol-bar::-webkit-progress-value {
+    background: #6cc4ff;
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(108, 196, 255, 0.9);
+}
+
+#mp-bar::-moz-progress-bar,
+#mp-vol-bar::-moz-progress-bar {
+    background: #6cc4ff;
+    border-radius: 3px;
+}
+
+#mp-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 62px;
+}
+
+#mp-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
+.mp-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.06);
+    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.mp-btn.main {
+    width: 62px;
+    height: 62px;
+}
+
+.mp-btn .mp-ico {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+    filter: invert(1);
+    opacity: 0.85;
+}
+
+.mp-btn.main .mp-ico {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+}
+
+.mp-btn.active {
+    border-color: #6cc4ff;
+    background: rgba(70, 150, 255, 0.34);
+    box-shadow: 0 0 20px rgba(80, 170, 255, 0.85);
+}
+
+.mp-btn.active .mp-ico {
+    opacity: 1;
+}
+
+#mp-volume {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    margin-top: -12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 26%;
+}
+
+#mp-vol-icon {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    filter: invert(1);
+    opacity: 0.75;
+}
+
+#mp-vol-bar {
+    height: 5px;
+}
+
+#mp-vol-text {
+    flex: 0 0 46px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+#music-panel.player-mode #mp-hint {
+    position: absolute;
+    left: 40px;
+    top: 54px;
+    bottom: auto;
+    margin: 0;
+    z-index: 2;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Photo gallery: a grid of thumbnails over the XMB waves, and a viewer that takes the whole screen. */
+#photo-panel {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    padding: 84px 80px 40px 80px;
+    box-sizing: border-box;
+    color: #fff;
+    background: ps3-xmb;
+    font: 300 18px/1.4 'Mulish', 'Segoe UI', sans-serif;
+    overflow: hidden;
+    z-index: 30;
+}
+
+#photo-panel.visible {
+    display: block;
+}
+
+#photo-panel.fade-wait {
+    opacity: 0;
+}
+
+#photo-panel.fade-in {
+    animation: panelFadeIn 0.4s ease-in-out backwards;
+}
+
+#photo-panel.fade-out {
+    animation: panelFadeOut 0.3s ease-in forwards;
+}
+
+#ph-title {
+    font-size: 40px;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 14px rgba(110, 180, 255, 0.5);
+}
+
+#ph-subtitle {
+    margin: 6px 0 22px 0;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ph-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.ph-tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 196px;
+    width: 196px;
+    height: 134px;
+    box-sizing: border-box;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    background: rgba(2, 6, 28, 0.55);
+    opacity: 0.72;
+    transition: opacity 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.ph-tile.active {
+    opacity: 1;
+    border-color: #6cc4ff;
+    box-shadow: 0 0 22px rgba(80, 170, 255, 0.85);
+}
+
+.ph-thumb {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#ph-hint {
+    position: absolute;
+    left: 80px;
+    bottom: 22px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+#photo-viewer {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 40;
+}
+
+#photo-viewer.visible {
+    display: block;
+    animation: vpOpen 0.35s ease-out both;
+}
+
+#photo-viewer.visible.fade-out {
+    animation: panelFadeOut 0.3s ease-in forwards;
+}
+
+#pv-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* changing picture: the old one slides away in the direction of the change and the new one slides in from the other side */
+#pv-stage.pv-out-left { animation: pvOutLeft 0.16s ease-in both; }
+#pv-stage.pv-out-right { animation: pvOutRight 0.16s ease-in both; }
+#pv-stage.pv-in-left { animation: pvInLeft 0.24s ease-out both; }
+#pv-stage.pv-in-right { animation: pvInRight 0.24s ease-out both; }
+
+@keyframes pvOutLeft { from { opacity: 1; transform: translateX(0px); } to { opacity: 0; transform: translateX(-90px); } }
+@keyframes pvOutRight { from { opacity: 1; transform: translateX(0px); } to { opacity: 0; transform: translateX(90px); } }
+@keyframes pvInLeft { from { opacity: 0; transform: translateX(-90px); } to { opacity: 1; transform: translateX(0px); } }
+@keyframes pvInRight { from { opacity: 0; transform: translateX(90px); } to { opacity: 1; transform: translateX(0px); } }
+
+#pv-info {
+    position: absolute;
+    left: 40px;
+    top: 26px;
+    padding: 8px 18px;
+    border-radius: 18px;
+    background: rgba(2, 6, 28, 0.62);
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.88);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+#pv-info.show {
+    opacity: 1;
+}
+
+#pv-help {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 14px;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* System Info: memory bar and the list of mounts. The mount point is large, its details medium. */
+#system-info .si-gap {
+    height: 14px;
+}
+
+#system-info .si-heading {
+    margin: 6px 0 8px 0;
+    font-size: 28px;
+    font-weight: 300;
+}
+
+/* The memory bar in the colours of the XMB: a translucent track and a blue that glows, with white text */
+#system-info .si-bar {
+    width: 100%;
+    max-width: 640px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(150, 200, 255, 0.45);
+    border-radius: 15px;
+    box-shadow: 0 0 14px rgba(70, 140, 255, 0.3);
+    overflow: hidden;
+}
+
+#system-info .si-bar-used {
+    height: 100%;
+    min-width: 56px;
+    background: linear-gradient(90deg, #2a6cf0 0%, #6cc4ff 100%);
+    border-radius: 15px;
+    box-shadow: 0 0 16px rgba(108, 196, 255, 0.85);
+}
+
+#system-info .si-bar-percent {
+    padding: 0 14px;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 30px;
+    color: #fff;
+    text-shadow: 0 0 8px rgba(0, 20, 80, 0.8);
+}
+
+#system-info .si-legend {
+    display: flex;
+    gap: 28px;
+    margin-top: 10px;
+}
+
+#system-info .si-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#system-info .si-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1px solid rgba(150, 200, 255, 0.6);
+}
+
+#system-info .si-swatch.used {
+    background: #6cc4ff;
+    box-shadow: 0 0 8px rgba(108, 196, 255, 0.9);
+}
+
+#system-info .si-swatch.free {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+#system-info .si-swatch.total {
+    background: transparent;
+}
+
+#system-info .si-legend-text {
+    font-size: 20px;
+    line-height: 1.3;
+}
+
+#system-info .si-mount {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 0;
+}
+
+#system-info .si-mount .item-icon {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    opacity: 0.9;
+}
+
+#system-info .si-mount-point {
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+#system-info .si-mount-detail {
+    font-size: 20px;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Fade along the bottom edge while the system information goes on below the screen */
+#system-info-more {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 110px;
+    background: linear-gradient(180deg, rgba(12, 22, 84, 0) 0%, rgba(12, 22, 84, 0.97) 100%);
+    pointer-events: none;
+    z-index: 31;
+}
+
+#system-info-more.visible {
+    display: block;
+}
+
+/* Power Off: the whole screen fades to black before the machine is shut down */
+#shutdown-fade {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    background: #000;
+}
+
+#shutdown-fade.visible {
+    display: block;
+    animation: panelFadeIn 2s ease-in both;
+}

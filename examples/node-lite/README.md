@@ -63,11 +63,11 @@ console.log(res.status, res.headers.get('content-type'), (await res.text()).leng
 cookies), servers must answer `identity` content (no gzip/br), and failures throw `TypeError: fetch failed` with the
 cause in `error.cause` (`ENOTFOUND`, `ECONNREFUSED`, certificate errors, ...).
 
-HTTPS uses a statically linked copy of mbedTLS 3.6.4 (`external/mbedtls`, TLS 1.2/1.3) and Mozilla's root certificates
-embedded from `external/ca/cacert.pem`, so the system needs no TLS library or CA package. Certificates are verified
+HTTPS uses a statically linked copy of mbedTLS 3.6.4 (`../external/mbedtls`, TLS 1.2/1.3) and Mozilla's root certificates
+embedded from `../external/ca/cacert.pem`, so the system needs no TLS library or CA package. Certificates are verified
 (expired, self-signed and wrong-host ones are rejected) and the system clock must be roughly right. `SSL_CERT_FILE`
 adds extra CAs and `NODE_TLS_REJECT_UNAUTHORIZED=0` disables verification, as in Node. To refresh the CAs, replace
-`external/ca/cacert.pem` (from https://curl.se/ca/cacert.pem) and rebuild.
+`../external/ca/cacert.pem` (from https://curl.se/ca/cacert.pem) and rebuild.
 
 ```
 build/node-lite example/fetch.js https://www.google.com
@@ -96,7 +96,7 @@ and dispatches itself (`src/net_native.c`, `poller` in `lib/node-lite.js`) inste
 `bash build.sh [BUILDROOT_DIR]` cross-compiles node-lite with the Buildroot toolchain and installs it as
 `/usr/bin/node-lite`, with the examples, the tests and this README under `/root/node-lite` (the generated
 `vectors.json` and `docs.vec.json` are left out). linweb runs it from there: `linweb.node` in scripts and
-System > Node Lite in the PS3 menu (see `examples/linweb/README.md`). The image brings the network up by itself:
+System > Node Lite in the PS3 menu (see `examples/linweb-system-os/README.md`). The image brings the network up by itself:
 `S41ethernet` runs `udhcpc` on wired interfaces (the kernel has `virtio-net` and `8139cp`) and System > Network
 Settings connects Wi-Fi. In QEMU, `make-iso.sh --qemu` adds a virtio NIC with NAT, so the guest gets 10.0.2.15 and
 reaches the internet through the host.

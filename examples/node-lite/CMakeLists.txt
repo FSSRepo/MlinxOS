@@ -14,9 +14,9 @@ set(QJS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../external/quickjs ${CMAKE_CURRENT_BINARY_DIR}/external/quickjs EXCLUDE_FROM_ALL)
 
 # mbedTLS (library only, default configuration) for https:// in fetch
-file(GLOB MBEDTLS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/external/mbedtls/library/*.c)
+file(GLOB MBEDTLS_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/../external/mbedtls/library/*.c)
 add_library(mbedtls_lite STATIC ${MBEDTLS_SOURCES})
-target_include_directories(mbedtls_lite PUBLIC external/mbedtls/include PRIVATE external/mbedtls/library)
+target_include_directories(mbedtls_lite PUBLIC ../external/mbedtls/include PRIVATE ../external/mbedtls/library)
 target_compile_options(mbedtls_lite PRIVATE -w)
 
 # Files embedded into the binary as C arrays: node-lite's JavaScript half and Mozilla's root certificates.
@@ -32,12 +32,12 @@ endfunction()
 embed_file(${CMAKE_CURRENT_SOURCE_DIR}/lib/node-lite.js node_lite_js ${CMAKE_CURRENT_BINARY_DIR}/node_lite_js.c)
 
 # keep only the certificates from the bundle (the file also carries a lot of commentary)
-file(READ ${CMAKE_CURRENT_SOURCE_DIR}/external/ca/cacert.pem CA_BUNDLE)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/../external/ca/cacert.pem CA_BUNDLE)
 string(REGEX MATCHALL "-----BEGIN CERTIFICATE-----[^-]*-----END CERTIFICATE-----" CA_CERTS "${CA_BUNDLE}")
 string(REPLACE ";" "\n" CA_PEM "${CA_CERTS}")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/ca-certificates.pem "${CA_PEM}\n")
 embed_file(${CMAKE_CURRENT_BINARY_DIR}/ca-certificates.pem node_lite_ca_pem ${CMAKE_CURRENT_BINARY_DIR}/node_lite_ca.c)
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/external/ca/cacert.pem)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../external/ca/cacert.pem)
 
 add_executable(node-lite
     src/main.c

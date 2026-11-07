@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1514">
+  <meta name="description" content="Node Lite: runtime JavaScript compacto con QuickJS y APIs familiares para servidores.">
+  <title>Node Lite — JavaScript en pequeño</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1514;--panel:#12211f;--text:#eef8f3;--muted:#a1b6ac;--green:#7ee0a3;--mint:#b5f4d0;--cyan:#78d6cc}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 85% 0,#17483b 0,transparent 38%),var(--bg);color:var(--text);font:16px/1.65 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}.wrap{width:min(1120px,calc(100% - 44px));margin:auto}a{color:inherit;text-decoration:none}.nav{height:82px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff17}.brand{display:flex;align-items:center;gap:12px;font-weight:760;letter-spacing:-.04em}.mark{width:36px;height:36px;border-radius:11px;background:var(--green);color:#082016;display:grid;place-items:center;font-weight:900;font-size:18px}.nav small{color:var(--muted)}
+    .hero{padding:94px 0 75px;display:grid;grid-template-columns:1.1fr .9fr;gap:54px;align-items:center}.eyebrow{color:var(--green);text-transform:uppercase;letter-spacing:.17em;font-size:12px;font-weight:760}.hero h1{font-size:clamp(48px,7vw,80px);line-height:1;letter-spacing:-.075em;margin:19px 0}.hero h1 span{color:var(--green)}.lead{font-size:19px;color:var(--muted);max-width:570px}.actions{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}.button{padding:12px 18px;border-radius:11px;background:var(--green);color:#092017;font-weight:760}.button.ghost{background:transparent;border:1px solid #ffffff2b;color:var(--text)}
+    .terminal{border:1px solid #ffffff20;border-radius:20px;background:#08100f;overflow:hidden;box-shadow:0 28px 80px #0007;transform:rotate(1deg)}.termbar{height:46px;background:#ffffff08;border-bottom:1px solid #ffffff12;display:flex;align-items:center;padding:0 16px;gap:7px}.dot{width:9px;height:9px;border-radius:50%;background:#ef7972}.dot:nth-child(2){background:#ebc66c}.dot:nth-child(3){background:#76d89a}.term-title{margin-left:auto;color:#82968d;font-size:12px}.code{padding:27px 24px 32px;font:13px/2.1 ui-monospace,SFMono-Regular,Consolas,monospace;color:#d1e4d9;white-space:nowrap;overflow:auto}.dim{color:#72877c}.green{color:var(--green)}.blue{color:#83d9d1}.orange{color:#f3c584}.prompt{color:#76d88f}.cursor{display:inline-block;width:7px;height:15px;background:var(--green);vertical-align:middle;margin-left:4px;animation:blink 1s steps(2,start) infinite}@keyframes blink{to{visibility:hidden}}
+    .details{padding:16px 0 90px}.heading{font-size:30px;letter-spacing:-.05em;margin:5px 0 25px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{padding:22px;border:1px solid #ffffff14;border-radius:16px;background:linear-gradient(145deg,#162824,#101c1a)}.icon{color:var(--green);font-size:22px}.card h2{font-size:17px;margin:10px 0 5px}.card p{font-size:14px;color:var(--muted);margin:0}.note{display:flex;gap:13px;align-items:flex-start;margin-top:16px;padding:17px 20px;border-left:2px solid var(--green);background:#ffffff07;color:var(--muted);font-size:14px;border-radius:0 12px 12px 0}.note strong{color:var(--text)}.footer{padding:24px 0 38px;border-top:1px solid #ffffff17;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:12px}
+    @media(max-width:760px){.hero{padding:66px 0 55px;grid-template-columns:1fr;gap:34px}.grid{grid-template-columns:1fr}.hero h1{font-size:58px}.nav small{display:none}.footer{flex-direction:column}.terminal{transform:none}}
+  </style>
+</head>
+<body>
+  <header class="wrap nav"><a class="brand" href="#inicio"><span class="mark">N</span><span>node<span style="color:var(--green)">lite</span></span></a><small>JavaScript runtime · pequeño y práctico</small></header>
+  <main id="inicio" class="wrap">
+    <section class="hero">
+      <div><div class="eyebrow">Menos peso. Más posibilidades.</div><h1>JavaScript<br><span>en pequeño.</span></h1><p class="lead">Node Lite combina QuickJS con una capa compacta de compatibilidad Node para ejecutar scripts y levantar servicios HTTP en sistemas ligeros.</p><div class="actions"><a class="button" href="#capacidades">Descubre Node Lite ↗</a><a class="button ghost" href="#codigo">Ver una idea</a></div></div>
+      <div class="terminal" id="codigo" aria-label="Ejemplo de código de Node Lite"><div class="termbar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><span class="term-title">server.js</span></div><div class="code"><span class="dim">// Un servidor pequeño, una idea clara</span><br><span class="orange">const</span> http = <span class="green">require</span>(<span class="blue">'http'</span>);<br><br>http.<span class="green">createServer</span>((req, res) =&gt; {<br>&nbsp; res.<span class="green">writeHead</span>(<span class="orange">200</span>, {<br>&nbsp;&nbsp;&nbsp; <span class="blue">'content-type'</span>: <span class="blue">'text/plain'</span><br>&nbsp; });<br>&nbsp; res.<span class="green">end</span>(<span class="blue">'Hola desde Node Lite'</span>);<br>}).<span class="green">listen</span>(<span class="orange">8400</span>);<br><br><span class="prompt">$</span> node-lite server.js <span class="cursor"></span></div></div>
+    </section>
+    <section class="details" id="capacidades"><div class="eyebrow">Hecho para sistemas ligeros</div><h2 class="heading">Lo esencial para crear y servir.</h2><div class="grid">
+      <article class="card"><div class="icon">⌁</div><h2>Runtime compacto</h2><p>QuickJS aporta JavaScript moderno con una huella pequeña para entornos embebidos.</p></article>
+      <article class="card"><div class="icon">↗</div><h2>HTTP integrado</h2><p>Crea servidores con una API familiar y atiende solicitudes directamente desde tus scripts.</p></article>
+      <article class="card"><div class="icon">◇</div><h2>APIs prácticas</h2><p>Módulos como <code>http</code>, <code>fs</code>, <code>path</code> y <code>fetch</code> para proyectos cotidianos.</p></article>
+    </div><div class="note"><span>✦</span><span><strong>Pequeño por decisión.</strong> Node Lite ofrece una capa compatible y enfocada; no pretende incluir cada módulo ni paquete del ecosistema Node.js.</span></div></section>
+  </main>
+  <footer class="wrap footer"><span>Node Lite · JavaScript con espacio para respirar.</span><span>Parte del ecosistema Steward OS</span></footer>
+</body>
+</html>

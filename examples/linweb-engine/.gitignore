@@ -1,0 +1,12 @@
+build/
+build-*/
+downloads/
+run.bat
+.playwright-mcp/
+examples/ps3--os/
+
+# fonts copied from Windows for the examples (proprietary); examples/fonts/fonts.css stays
+examples/fonts/*.ttf
+
+# captures of the browser comparison
+brave_wifi_*.png

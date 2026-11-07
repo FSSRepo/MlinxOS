@@ -16,7 +16,7 @@
 #include "mbedtls/x509_crt.h"
 #include "psa/crypto.h"
 
-/* Mozilla's root certificates, embedded at build time from external/ca/cacert.pem */
+/* Mozilla's root certificates, embedded at build time from examples/external/ca/cacert.pem */
 extern const unsigned char node_lite_ca_pem[];
 extern const unsigned long node_lite_ca_pem_len;
 

@@ -20,6 +20,16 @@ regenerable artifacts (`output/`, `dl/`, ISOs, binaries) are omitted.
 
 All three share the hostname `MLinxOS` and the welcome message `Welcome to MLinxOS`.
 
+### Linweb (the graphical shell)
+
+The PS3-style menu that `wayland-os` boots into is **Linweb**, split in two:
+
+- the **generic web engine** (HTML/CSS/JavaScript renderer with standard `<audio>`/`<video>`, HTTP(S) streaming and
+  asynchronous pictures) lives in its own repository, `Linweb-web-engine`;
+- the **OS module** [`examples/linweb-system-os`](examples/linweb-system-os/README.md) adds what only the system can do
+  (storage, network/Wi-Fi, gamepad, the `ring` shader, the `linweb.*` object) and the `ps3` demo. `examples/linweb-engine`
+  is a read-only copy of the engine made by `sync-engine.sh`.
+
 ---
 
 ## System requirements

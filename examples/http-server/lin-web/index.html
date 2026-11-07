@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131d">
+  <meta name="description" content="Lin Web: un motor ligero para explorar la web desde Steward OS.">
+  <title>Lin Web — La web, en movimiento</title>
+  <style>
+    :root{color-scheme:dark;--bg:#10131d;--panel:#191e2b;--text:#f4f5fb;--muted:#a6aec1;--lime:#c7f36b;--blue:#7b9cff}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 78% 4%,#283355 0,transparent 36%),var(--bg);color:var(--text);font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    a{color:inherit;text-decoration:none}.wrap{width:min(1120px,calc(100% - 44px));margin:auto}.nav{height:82px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff14}.brand{display:flex;align-items:center;gap:12px;font-weight:750;letter-spacing:-.04em}.mark{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--lime),#83d9a2);display:grid;place-items:center;color:#111827;font-weight:900}.nav small{color:var(--muted)}
+    .hero{padding:100px 0 82px;display:grid;grid-template-columns:1.05fr .95fr;gap:60px;align-items:center}.eyebrow{color:var(--lime);text-transform:uppercase;letter-spacing:.18em;font-size:12px;font-weight:750}.hero h1{font-size:clamp(48px,7vw,82px);line-height:.99;letter-spacing:-.075em;margin:20px 0}.hero h1 span{color:var(--lime)}.lead{font-size:19px;color:var(--muted);max-width:580px}.actions{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}.button{padding:12px 18px;border-radius:12px;background:var(--lime);color:#131827;font-weight:750}.button.ghost{border:1px solid #ffffff2b;background:transparent;color:var(--text)}
+    .visual{min-height:330px;border:1px solid #ffffff1c;border-radius:26px;background:linear-gradient(145deg,#232b3b,#151a27);padding:22px;box-shadow:0 32px 90px #0005;position:relative;overflow:hidden}.visual:after{content:"";position:absolute;width:250px;height:250px;border-radius:50%;right:-75px;bottom:-110px;background:#c7f36b20;filter:blur(2px)}.window{border:1px solid #ffffff20;border-radius:16px;overflow:hidden;background:#111621;position:relative;z-index:1}.bar{height:42px;display:flex;align-items:center;gap:6px;padding:0 13px;background:#ffffff08;border-bottom:1px solid #ffffff12}.dot{width:8px;height:8px;border-radius:50%;background:#f17979}.dot:nth-child(2){background:#f6cc67}.dot:nth-child(3){background:#81d6a0}.address{margin-left:12px;color:#9da8be;font-size:11px;background:#ffffff0c;border-radius:6px;padding:3px 12px;flex:1}.page{padding:35px 28px 42px}.page .line{height:8px;border-radius:9px;background:#ffffff19;margin:13px 0;width:70%}.page .line.short{width:43%}.page .tile{display:inline-block;width:28%;height:72px;margin:19px 8px 0 0;border-radius:10px;background:linear-gradient(135deg,#c7f36b55,#829cff55)}.orb{position:absolute;width:105px;height:105px;border:1px solid #c7f36b55;border-radius:50%;right:14%;top:15%;box-shadow:0 0 0 18px #c7f36b08,0 0 0 38px #c7f36b06}
+    .features{padding:22px 0 90px}.section-title{font-size:30px;letter-spacing:-.05em;margin:0 0 24px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{background:var(--panel);border:1px solid #ffffff12;border-radius:17px;padding:22px}.icon{font-size:22px}.card h2{font-size:17px;margin:12px 0 5px}.card p{margin:0;color:var(--muted);font-size:14px}.footer{padding:24px 0 38px;border-top:1px solid #ffffff14;color:var(--muted);font-size:13px;display:flex;justify-content:space-between;gap:12px}
+    @media(max-width:760px){.hero{padding:68px 0 55px;grid-template-columns:1fr;gap:36px}.grid{grid-template-columns:1fr}.visual{min-height:280px}.hero h1{font-size:58px}.nav small{display:none}.footer{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <header class="wrap nav"><a class="brand" href="#inicio"><span class="mark">L</span><span>lin<span style="color:var(--lime)">web</span></span></a><small>Un proyecto de Steward OS</small></header>
+  <main id="inicio" class="wrap">
+    <section class="hero">
+      <div><div class="eyebrow">Ligero por diseño</div><h1>La web,<br><span>en movimiento.</span></h1><p class="lead">Lin Web es un motor de navegador experimental creado desde cero: interpreta páginas y las convierte en una experiencia visual propia.</p><div class="actions"><a class="button" href="#explora">Explora el proyecto ↗</a><a class="button ghost" href="#motor">Conoce el motor</a></div></div>
+      <div class="visual" aria-label="Ilustración abstracta de una ventana de navegador"><div class="orb"></div><div class="window"><div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i><div class="address">linweb — un nuevo punto de vista</div></div><div class="page"><div class="line short"></div><div class="line" style="width:88%"></div><div class="line" style="width:61%"></div><i class="tile"></i><i class="tile" style="background:linear-gradient(135deg,#7b9cff66,#c7f36b44)"></i><i class="tile" style="background:linear-gradient(135deg,#ef9ee755,#7b9cff55)"></i></div></div></div>
+    </section>
+    <section class="features" id="explora"><div class="eyebrow">Dentro de Lin Web</div><h2 class="section-title" id="motor">Un navegador construido pieza a pieza.</h2><div class="grid">
+      <article class="card"><div class="icon">◈</div><h2>HTML y CSS</h2><p>Un pipeline propio de análisis, estilos y layout que da forma al contenido.</p></article>
+      <article class="card"><div class="icon">✳</div><h2>Renderizado OpenGL</h2><p>Texto, imágenes, formas y superficies dibujados con un renderer nativo.</p></article>
+      <article class="card"><div class="icon">⌘</div><h2>JavaScript integrado</h2><p>QuickJS conecta las páginas con APIs de navegador como DOM, eventos y temporizadores.</p></article>
+    </div></section>
+  </main>
+  <footer class="wrap footer"><span>Lin Web · Explorando otra forma de navegar.</span><span>Parte del ecosistema Steward OS</span></footer>
+</body>
+</html>

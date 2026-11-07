@@ -30,6 +30,16 @@ The PS3-style menu that `wayland-os` boots into is **Linweb**, split in two:
   (storage, network/Wi-Fi, gamepad, the `ring` shader, the `linweb.*` object) and the `ps3` demo. `examples/linweb-engine`
   is a read-only copy of the engine made by `sync-engine.sh`.
 
+### Switching the compositor of one Buildroot tree
+
+`wayland-os` and `xorg-os` can share one tree (`~/Desktop/system-base`) so that what both use (toolchain, kernel, Mesa
+tools, libdrm, ALSA, Wi-Fi and storage tools...) is built once. Copy `switch-compositor.sh` and `compositor/common.txt` (the list
+of shared packages) into the tree and run `bash switch-compositor.sh weston|xorg`. It parks the packages that are specific
+to the compositor you leave, brings back the other's, and swaps `build.sh`, `mlinxos_config/post-build.sh` and `.config`
+(kept in `compositor/<name>/files/`). The install stamps of the shared packages travel with `target/` and `images/`, so the
+next `make` only copies what the other target lacks. The X.Org profile is `xorg-os/configs/mlinxos_defconfig`
+(`make mlinxos_xorg_defconfig` after copying it to `configs/`); build `linweb` for it with `PLATFORM=xorg`.
+
 ---
 
 ## System requirements

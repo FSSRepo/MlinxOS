@@ -1,46 +1,24 @@
-# Architecture and Toolchain
-# Sets the system architecture to 64-bit x86
 BR2_x86_64=y
-# Uses custom Linux 6.12 kernel headers for the toolchain
 BR2_PACKAGE_HOST_LINUX_HEADERS_CUSTOM_6_12=y
-# Enables C++ language support in the toolchain
 BR2_TOOLCHAIN_BUILDROOT_CXX=y
-# Forces hash verification for all downloads (stronger security)
-BR2_DOWNLOAD_FORCE_CHECK_HASHES=y
-
+BR2_TOOLCHAIN_GLIBC_GCONV_LIBS_COPY=y
 BR2_GLOBAL_PATCH_DIR="mlinxos_config/patches"
-
-# System Identity and Scripts
-# System hostname
+BR2_DOWNLOAD_FORCE_CHECK_HASHES=y
 BR2_TARGET_GENERIC_HOSTNAME="MLinxOS"
-# Welcome message shown at login
 BR2_TARGET_GENERIC_ISSUE="Welcome to MLinxOS"
-# Arguments passed to the post-build script (the current defconfig file)
-
-BR2_ROOTFS_POST_BUILD_SCRIPT="mlinxos_config/post-build.sh"
-BR2_ROOTFS_POST_SCRIPT_ARGS="$(BR2_DEFCONFIG)"
 BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV=y
+BR2_ROOTFS_POST_BUILD_SCRIPT="mlinxos_config/post-build.sh"
 
-# Linux Kernel
-# Enables the Linux kernel build
+BR2_ROOTFS_POST_SCRIPT_ARGS="$(BR2_DEFCONFIG)"
+
 BR2_LINUX_KERNEL=y
-# Indicates that a custom kernel version will be used
 BR2_LINUX_KERNEL_CUSTOM_VERSION=y
-# Specifies the exact kernel version (6.12.47)
 BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="6.12.47"
-# Indicates that a custom kernel configuration file will be used
 BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
-# Path to the kernel configuration file (.config)
 BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="mlinxos_config/linux.config"
-
-# Builds the kernel image in vmlinux format
 BR2_LINUX_KERNEL_BZIMAGE=y
-# Uses XZ compression for the kernel image
 BR2_LINUX_KERNEL_XZ=y
-# The kernel needs the host libelf library to build
 BR2_LINUX_KERNEL_NEEDS_HOST_LIBELF=y
-
-# Includes the Mesa3D library for graphics rendering
 BR2_PACKAGE_MESA3D=y
 BR2_PACKAGE_MESA3D_LLVM=y
 BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_LLVMPIPE=y
@@ -48,49 +26,28 @@ BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_VIRGL=y
 BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_CROCUS=y
 BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_IRIS=y
 BR2_PACKAGE_MESA3D_GALLIUM_DRIVER_SVGA=y
-BR2_PACKAGE_LIBGLVND=y
-BR2_PACKAGE_MESA3D_OPENGL_GLX=y
-BR2_PACKAGE_MESA3D_OPENGL_EGL=y
 BR2_PACKAGE_MESA3D_OPENGL_ES=y
-# X.Org desktop profile; Weston is intentionally disabled.
-# BR2_PACKAGE_WESTON is not set
-BR2_PACKAGE_XORG7=y
-BR2_PACKAGE_XSERVER_XORG_SERVER=y
-# libepoxy enables glamor in Xorg, which modesetting needs for DRI3 acceleration.
-# glamor also needs the Composite extension (libXcomposite enables it in Xorg).
-BR2_PACKAGE_LIBEPOXY=y
-BR2_PACKAGE_XLIB_LIBXCOMPOSITE=y
-BR2_PACKAGE_HOST_PATCHELF=y
-BR2_PACKAGE_XDRIVER_XF86_VIDEO_FBDEV=y
-BR2_PACKAGE_XDRIVER_XF86_VIDEO_VESA=y
-BR2_PACKAGE_XLIB_LIBXAW=y
-BR2_PACKAGE_XAPP_SETXKBMAP=y
-BR2_PACKAGE_XDRIVER_XF86_INPUT_EVDEV=y
-BR2_PACKAGE_XDRIVER_XF86_INPUT_LIBINPUT=y
-BR2_PACKAGE_EUDEV_RULES_GEN=y
-BR2_PACKAGE_LIBDRM_INTEL=y
 BR2_PACKAGE_LINUX_FIRMWARE=y
 BR2_PACKAGE_LINUX_FIRMWARE_I915=y
-BR2_PACKAGE_LIBXKBCOMMON=y
-BR2_PACKAGE_LIBXKBCOMMON_TOOLS=y
-
+BR2_PACKAGE_LIBDRM_INTEL=y
+BR2_PACKAGE_LIBDRM_NOUVEAU=y
+BR2_PACKAGE_LIBDRM_VMWGFX=y
 BR2_PACKAGE_MTDEV=y
-# Library for handling generic input devices (keyboard, mouse)
-BR2_PACKAGE_LIBEVDEV=y
-
-# System Utilities
-# (Disabled) Scripts for ifup/ifdown network interfaces
+BR2_PACKAGE_XUTIL_UTIL_MACROS=y
 # BR2_PACKAGE_IFUPDOWN_SCRIPTS is not set
-# Base Linux utilities package (mount, fdisk, etc.)
-BR2_PACKAGE_UTIL_LINUX=y
+# BR2_TARGET_ROOTFS_TAR is not set
 
-# Filesystem and Bootloader
 # The system is a squashfs read from the live medium; the small initramfs is built by post-build.sh.
 # BR2_TARGET_ROOTFS_CPIO is not set
 BR2_TARGET_ROOTFS_SQUASHFS=y
 BR2_TARGET_ROOTFS_SQUASHFS4_XZ=y
+
 BR2_PACKAGE_E2FSPROGS=y
 BR2_PACKAGE_DOSFSTOOLS=y
+
+# GRUB for BIOS: the installer puts it in the MBR of the target disk (grub-install).
+BR2_TARGET_GRUB2=y
+BR2_TARGET_GRUB2_I386_PC=y
 BR2_PACKAGE_DOSFSTOOLS_MKFS_FAT=y
 BR2_PACKAGE_ALSA_LIB=y
 BR2_PACKAGE_ALSA_UTILS=y
@@ -112,3 +69,29 @@ BR2_PACKAGE_WPA_SUPPLICANT_CTRL_IFACE=y
 BR2_PACKAGE_WPA_SUPPLICANT_CLI=y
 BR2_PACKAGE_WPA_SUPPLICANT_PASSPHRASE=y
 BR2_PACKAGE_IW=y
+
+# X.Org profile (Weston is disabled)
+BR2_PACKAGE_LIBGLVND=y
+BR2_PACKAGE_MESA3D_OPENGL_GLX=y
+BR2_PACKAGE_MESA3D_OPENGL_EGL=y
+# BR2_PACKAGE_WESTON is not set
+BR2_PACKAGE_XORG7=y
+BR2_PACKAGE_XSERVER_XORG_SERVER=y
+# libepoxy enables glamor in Xorg, which modesetting needs for DRI3 acceleration.
+# glamor also needs the Composite extension (libXcomposite enables it in Xorg).
+BR2_PACKAGE_LIBEPOXY=y
+BR2_PACKAGE_XLIB_LIBXCOMPOSITE=y
+BR2_PACKAGE_HOST_PATCHELF=y
+BR2_PACKAGE_XDRIVER_XF86_VIDEO_FBDEV=y
+BR2_PACKAGE_XDRIVER_XF86_VIDEO_VESA=y
+BR2_PACKAGE_XLIB_LIBXAW=y
+BR2_PACKAGE_XAPP_SETXKBMAP=y
+BR2_PACKAGE_XDRIVER_XF86_INPUT_EVDEV=y
+BR2_PACKAGE_XDRIVER_XF86_INPUT_LIBINPUT=y
+BR2_PACKAGE_EUDEV_RULES_GEN=y
+BR2_PACKAGE_LIBXKBCOMMON=y
+BR2_PACKAGE_LIBXKBCOMMON_TOOLS=y
+BR2_PACKAGE_LIBEVDEV=y
+BR2_PACKAGE_UTIL_LINUX=y
+# Xorg and its fonts link against libpng; nothing else selects it in this profile
+BR2_PACKAGE_LIBPNG=y

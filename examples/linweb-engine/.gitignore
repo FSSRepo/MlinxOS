@@ -1,6 +1,5 @@
 build/
 build-*/
-downloads/
 run.bat
 .playwright-mcp/
 examples/ps3--os/

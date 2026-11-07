@@ -3,6 +3,7 @@
 #include "network/http_client.h"
 #include "media/byte_reader.h"
 #include "app/app_state.h"
+#include "utils/memory_files.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -17,12 +18,20 @@
 namespace linweb {
 
 namespace {
+// A picture of a page held in memory (memory_files) or of a file: decoded from the bytes, or read by stb
+unsigned char* load_picture(const std::string& path, int& width, int& height, int& channels) {
+    if (auto bytes = memory_files::find(path))
+        return stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(bytes->data()), static_cast<int>(bytes->size()), &width, &height, &channels, 0);
+    return stbi_load(path.c_str(), &width, &height, &channels, 0);
+}
+
 // A file under this size is decoded where it is asked for: it is quick, and an icon must not appear a frame late
 const long kAsyncBytes = 384 * 1024;
 // Past this much picture memory (with its mipmaps) the least recently used large textures are freed
 const size_t kLargeTextureBytes = 2u * 1024 * 1024;
 
 long file_size(const std::string& path) {
+    if (auto bytes = memory_files::find(path)) return static_cast<long>(bytes->size());
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) return -1;
     return static_cast<long>(file.tellg());
@@ -136,7 +145,7 @@ void TextureManager::worker_main() {
             }
             remember_url_size(job->path, width, height);
         } else {
-            data = stbi_load(job->path.c_str(), &width, &height, &channels, 0);
+            data = load_picture(job->path, width, height, channels);
             if (!data) {
                 job->state = 3;
                 continue;
@@ -195,7 +204,7 @@ Texture TextureManager::upload(const std::string& path, unsigned char* data, int
     Usage entry;
     entry.frame = frame_;
     entry.bytes = static_cast<size_t>(width) * static_cast<size_t>(height) * 4u;
-    if (!is_http_url(path)) {
+    if (!is_http_url(path) && !memory_files::find(path)) {
         // the time the file was written: get_texture() compares it again after a second (see file_changed)
         std::error_code error;
         entry.modified = std::filesystem::last_write_time(path, error);
@@ -247,7 +256,7 @@ void TextureManager::set_budget_mb(size_t megabytes) {
 // the file is read again at most once a second; when it moved, the stale texture is freed here (the GL thread) and the
 // caller loads the picture anew.
 bool TextureManager::file_changed(const std::string& path) {
-    if (is_http_url(path)) return false;    // a downloaded file does not change under its name
+    if (is_http_url(path) || memory_files::find(path)) return false;    // a downloaded file does not change under its name
     auto entry = usage.find(path);
     if (entry == usage.end()) return false;
     const auto now = std::chrono::steady_clock::now();
@@ -283,7 +292,7 @@ Texture TextureManager::get_texture(const std::string& path) {
     if (!media::is_url(path) && file_size(path) < kAsyncBytes) {
         int width, height, channels;
         stbi_set_flip_vertically_on_load(false);
-        unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
+        unsigned char* data = load_picture(path, width, height, channels);
         if (!data) {
             std::cerr << "Failed to load texture: " << path << " Error: " << stbi_failure_reason() << std::endl;
             failed.insert(path);
@@ -331,7 +340,10 @@ bool TextureManager::image_size(const std::string& path, int& width, int& height
     auto known = sizes.find(path);
     if (known == sizes.end()) {
         int w = 0, h = 0, channels = 0;
-        if (!stbi_info(path.c_str(), &w, &h, &channels)) w = h = 0;
+        const auto bytes = memory_files::find(path);
+        const bool known_size = bytes ? stbi_info_from_memory(reinterpret_cast<const stbi_uc*>(bytes->data()), static_cast<int>(bytes->size()), &w, &h, &channels)
+                                      : stbi_info(path.c_str(), &w, &h, &channels);
+        if (!known_size) w = h = 0;
         known = sizes.emplace(path, std::make_pair(w, h)).first;
     }
     width = known->second.first;

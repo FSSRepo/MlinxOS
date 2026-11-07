@@ -133,14 +133,5 @@ std::string prepare_page_resources(const std::shared_ptr<Node>& root, const std:
     return css;
 }
 
-std::string download_directory_for(const std::string& url) {
-    size_t scheme = url.find("://");
-    std::string name = scheme == std::string::npos ? url : url.substr(scheme + 3);
-    for (char& c : name) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '.' && c != '-') c = '_';
-    }
-    if (name.size() > 80) name.resize(80);
-    return "downloads/" + name;
-}
 
 }

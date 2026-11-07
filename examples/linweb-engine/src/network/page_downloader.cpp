@@ -3,14 +3,13 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 namespace linweb {
@@ -125,11 +124,6 @@ std::vector<Tag> scan_tags(const std::string& html) {
     }
     return tags;
 }
-void write_file(const std::filesystem::path& path, const std::string& bytes) {
-    std::ofstream out(path, std::ios::binary | std::ios::trunc);
-    if (!out || !out.write(bytes.data(), static_cast<std::streamsize>(bytes.size())))
-        throw std::runtime_error("Cannot write " + path.string());
-}
 std::string safe_field(std::string s) {
     for (char& c : s) if (c == '\t' || c == '\r' || c == '\n') c = ' ';
     return s;
@@ -152,7 +146,7 @@ std::string filename(const std::string& url, bool css) {
 struct Entry { std::string url, file, error; size_t bytes = 0; };
 class Downloader {
     HttpClient client;
-    std::filesystem::path directory;
+    FileSink store;
     std::map<std::string, Entry> entries;
     size_t total_bytes = 0;
     size_t failures = 0;
@@ -199,7 +193,7 @@ class Downloader {
                 if (extension != extensions.end()) saved.file.replace(saved.file.size() - 4, 4, extension->second);
             }
             if (stylesheet) response.body = rewrite_css(response.body, response.url, depth + 1);
-            write_file(directory / saved.file, response.body);
+            store(saved.file, response.body);
             ++downloaded;
             return saved.file + fragment;
         } catch (const std::exception& e) {
@@ -283,9 +277,7 @@ class Downloader {
         return result;
     }
 public:
-    explicit Downloader(const std::string& output) : directory(std::filesystem::absolute(output)) {
-        std::filesystem::create_directories(directory);
-    }
+    explicit Downloader(FileSink sink) : store(std::move(sink)) {}
     DownloadSummary run(const std::string& url) {
         std::cout << "GET " << url << std::endl;
         HttpResponse response = client.get(url);
@@ -338,7 +330,7 @@ public:
             if (tag.name == "style") patches.push_back({tag.content_start, tag.content_length,
                 rewrite_css(response.body.substr(tag.content_start, tag.content_length), base, 0)});
         }
-        write_file(directory / "index.html", patched(response.body, std::move(patches)));
+        store("index.html", patched(response.body, std::move(patches)));
         std::ostringstream manifest;
         manifest << "url\tfile\tbytes\tstatus\n" << safe_field(response.url) << "\tindex.html\t" << response.body.size() << "\tok\n";
         for (const auto& pair : entries) {
@@ -346,12 +338,12 @@ public:
             manifest << safe_field(entry.url) << '\t' << (entry.error.empty() ? entry.file : "") << '\t' << entry.bytes << '\t'
                      << (entry.error.empty() ? "ok" : safe_field(entry.error)) << '\n';
         }
-        write_file(directory / "manifest.tsv", manifest.str());
-        return {(directory / "index.html").string(), response.url, downloaded + 1, failures};
+        store("manifest.tsv", manifest.str());
+        return {"index.html", response.url, downloaded + 1, failures};
     }
 };
 } // namespace
-DownloadSummary download_page(const std::string& url, const std::string& output_directory) {
-    return Downloader(output_directory).run(url);
+DownloadSummary download_page(const std::string& url, const FileSink& sink) {
+    return Downloader(sink).run(url);
 }
 } // namespace linweb

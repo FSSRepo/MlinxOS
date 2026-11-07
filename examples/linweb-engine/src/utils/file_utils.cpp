@@ -1,4 +1,5 @@
 #include "file_utils.h"
+#include "utils/memory_files.h"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -10,6 +11,7 @@
 namespace linweb {
 
 std::string read_file(const std::string& path) {
+    if (auto bytes = memory_files::find(path)) return *bytes;
     std::ifstream file(path);
     if (!file.is_open()) return "";
     std::stringstream buffer;
@@ -19,9 +21,14 @@ std::string read_file(const std::string& path) {
 
 std::vector<std::string> read_file_lines(const std::string& path) {
     std::vector<std::string> lines;
+    std::string line;
+    if (auto bytes = memory_files::find(path)) {
+        std::istringstream memory(*bytes);
+        while (std::getline(memory, line)) lines.push_back(line);
+        return lines;
+    }
     std::ifstream file(path);
     if (!file.is_open()) return lines;
-    std::string line;
     while (std::getline(file, line)) {
         lines.push_back(line);
     }
@@ -29,6 +36,7 @@ std::vector<std::string> read_file_lines(const std::string& path) {
 }
 
 bool file_exists(const std::string& path) {
+    if (memory_files::find(path)) return true;
     std::ifstream file(path);
     return file.good();
 }

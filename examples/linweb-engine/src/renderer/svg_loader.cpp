@@ -5,6 +5,7 @@
 #include <regex>
 #include "core/dom.h"
 #include "utils/log.h"
+#include "utils/memory_files.h"
 
 #define NANOSVG_IMPLEMENTATION
 #include "nanosvg.h"
@@ -78,6 +79,23 @@ namespace linweb
         return result;
     }
 
+    // The text of an SVG file, from memory when the page was loaded from a URL
+    static bool read_svg(const std::string &path, std::string &content)
+    {
+        if (auto bytes = memory_files::find(path))
+        {
+            content = *bytes;
+            return true;
+        }
+        std::ifstream file(path);
+        if (!file.is_open())
+            return false;
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        content = buffer.str();
+        return true;
+    }
+
     // nanosvg reads colours as #rrggbb or rgb(); a CSS rgba(...) colour loses its paint, so it is split into
     // an opaque hex colour (for the paint) and an alpha (applied to the pixels after rasterizing).
     static std::string svg_paint_from_css(const std::string &color, float &alpha)
@@ -109,17 +127,13 @@ namespace linweb
         const std::string color = svg_paint_from_css(css_color, alpha);
         log_event("svg", "load " + path + " " + std::to_string(width) + "x" + std::to_string(height) +
                              (css_color.empty() ? "" : " color=" + css_color + " paint=" + color + " alpha=" + std::to_string(alpha)));
-        std::ifstream file(path);
-        if (!file.is_open())
+        std::string content;
+        if (!read_svg(path, content))
         {
             std::cerr << "Failed to open SVG file: " << path << std::endl;
             log_event("svg", "FAILED open " + path);
             return {0, 0, 0};
         }
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
         log_event("svg", "read " + std::to_string(content.size()) + " bytes from " + path);
         std::string processed = preprocess(content, width, height, color);
 
@@ -279,16 +293,12 @@ namespace linweb
             return true;
         }
 
-        std::ifstream file(path);
-        if (!file.is_open())
+        std::string content;
+        if (!read_svg(path, content))
         {
             log_event("svg", "size: FAILED open " + path);
             return false;
         }
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string content = buffer.str();
 
         if (get_intrinsic_size_from_string(content, width, height))
         {

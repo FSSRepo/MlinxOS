@@ -44,6 +44,7 @@
 #include "utils/file_utils.h"
 #include "utils/layout_traversal.h"
 #include "utils/log.h"
+#include "utils/memory_files.h"
 #include "utils/page_resources.h"
 #include "utils/scroll_manager.h"
 #if !defined(WESTON_PLATFORM) && !defined(XORG_PLATFORM)
@@ -94,15 +95,18 @@ int linweb::run(int argc, char** argv) {
     times.start = StartupTimes::Clock::now();
 
     if (is_http_url(html_file)) {
-        // a URL is downloaded with its files, and the local copy of the page is what gets loaded
-        DownloadSummary summary = download_page(html_file, download_directory_for(html_file));
-        log_event("download", html_file + " -> " + summary.html_path + " (" + std::to_string(summary.downloaded) +
-                  " files, " + std::to_string(summary.failed) + " failed)");
+        // a URL is downloaded with its files into memory (nothing is written to disk), and the page is loaded from there
+        const std::string directory = memory_files::new_directory();
+        DownloadSummary summary = download_page(html_file, [&directory](const std::string& name, const std::string& bytes) {
+            memory_files::put(directory + "/" + name, bytes);
+        });
+        log_event("download", html_file + " -> memory (" + std::to_string(summary.downloaded) + " files, " +
+                  std::to_string(summary.failed) + " failed)");
         if (summary.html_path.empty()) {
             std::cerr << "Could not download " << html_file << std::endl;
             return -1;
         }
-        html_file = summary.html_path;
+        html_file = directory + "/" + summary.html_path;
     }
 
     std::string html_base_dir = get_directory(html_file);

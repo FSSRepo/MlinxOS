@@ -109,73 +109,40 @@ build\Release\linweb.exe --debug=dimens examples/index.html
 build\Release\linweb.exe --debug=anim examples/index.html
 ```
 
-### Download a web page on Windows
+### Pages from a URL
 
-`linweb-download` downloads HTML and its static resources without opening a
-window or executing JavaScript. HTTPS uses the bundled **mbedTLS 3.6.4**, its
-Winsock socket backend, and the Mozilla CA bundle in `external/ca/cacert.pem`.
-Certificates and hostnames are verified. No system TLS installation is needed.
+`linweb.exe https://example.com/` loads a page from the network. The HTML and its
+static resources (stylesheets, images, CSS images and fonts, `srcset` candidates and
+CSS imports) are downloaded into memory, not into a folder: nothing is written to disk.
+Resources that are streamed when they play (`<audio>`, `<video>`, media files) keep their
+address. JavaScript is not inspected for resources, so pictures a script creates later
+are fetched when they are used (`new Image().src = "https://..."` works).
 
-To build just the downloader with Visual Studio 2022 (no GLFW, OpenGL or QuickJS
-required), run from the repository root in PowerShell:
+HTTPS uses the bundled **mbedTLS 3.6.4** and the Mozilla CA bundle in
+`external/ca/cacert.pem`. Certificates and hostnames are verified; no system TLS
+installation is needed. The CA bundle is embedded during CMake configuration:
+replace `external/ca/cacert.pem` and rebuild to update the trusted roots. Keep the
+clock correct for certificate expiration checks. The mbedTLS license is preserved in
+`external/mbedtls/LICENSE`; the CA provenance is in the PEM header. To test a host
+that is not in DNS, set `LINWEB_RESOLVE=host=ip`; to trust another certificate,
+set `LINWEB_CA_FILE=<file>`.
 
-```powershell
-cmake -S . -B build-network -DLINWEB_BUILD_ENGINE=OFF
-cmake --build build-network --config Release --parallel 4
-.\build-network\Release\linweb-download.exe https://example.com downloads/example
-```
+Relative URLs, `<base href>`, HTTP redirects, binary bodies, `Content-Length` and
+chunked transfer encoding are supported. It does not follow page links or iframes,
+resolve JavaScript module imports or maintain cookies. The client requests
+uncompressed responses (`Accept-Encoding: identity`); servers that insist on
+gzip/Brotli return an explicit error.
 
-The regular engine build also includes the `linweb-download` target.
-The destination defaults to `downloads/page` when omitted. Downloads produce:
-
-- `index.html`, with downloaded resource references rewritten to local files.
-- `resource-*` files: stylesheets, scripts, images, CSS images/fonts, and other
-  static dependencies, including CSS imports and HTML `srcset` candidates.
-- `manifest.tsv`, recording each URL, local filename, original byte count, and
-  success or error. Failed resource references retain their absolute URLs.
-
-Relative URLs, `<base href>`, HTTP redirects, binary bodies, `Content-Length`
-and chunked transfer encoding are supported. CSS dependencies use the final
-stylesheet URL after redirects. Files are saved together so CSS references also
-work from disk. To try the snapshot in the existing renderer:
-
-```powershell
-.\build\Release\linweb.exe downloads/example/index.html
-```
-
-This is a static download, not full browser compatibility. It does not fetch
-resources created by JavaScript, follow page links or iframes, resolve JavaScript
-module imports, maintain cookies, or implement browser DOM/network APIs. CSS
-escaped URLs and `srcset` lists containing `data:` are left unchanged. The client
-requests uncompressed responses (`Accept-Encoding: identity`); servers that
-insist on gzip/Brotli return an explicit error. Rendering the saved page still
-depends on Linweb's HTML/CSS support. The downloader does not run page scripts;
-opening the snapshot in the renderer uses its existing scripting behavior.
-
-Limits: 10 redirects per request, 64 MiB per response, 256 MiB per page, 512
-static resources and 16 dependency levels. Reads have a 15-second inactivity
-timeout; DNS/connect use OS timeouts. Exit codes: `0` for success, `2` for a page
-saved with failed dependencies, and `1` for a page/download/write error.
-Existing generated files in the chosen destination are overwritten; old files
-are not deleted. Choose a separate destination for each page.
-
-The CA bundle is embedded during CMake configuration. Replace
-`external/ca/cacert.pem` and rebuild to update trusted roots. Keep the Windows
-clock correct for certificate expiration checks. The original mbedTLS license
-is preserved in `external/mbedtls/LICENSE`; CA provenance is in the PEM header.
-
-Network checks (Python 3 enables the local HTTP fixture test):
-
-```powershell
-ctest --test-dir build-network -C Release --output-on-failure
-```
+Limits: 10 redirects per request, 64 MiB per response, 256 MiB per page, 512 static
+resources and 16 dependency levels. Reads have a 15-second inactivity timeout;
+DNS/connect use OS timeouts.
 
 ### Static rendering and visual checks
 
-Render the downloaded snapshot without running page JavaScript:
+Render a page without running its JavaScript:
 
 ```powershell
-.\build\Release\linweb.exe --static downloads/example/index.html
+.\build\Release\linweb.exe --static examples/index.html
 ```
 
 Fonts are copied beside `linweb.exe` during the build. Text rendering accepts
@@ -193,7 +160,7 @@ and automatically enables static mode. The optional layout dump records box
 positions and computed dimensions as TSV:
 
 ```powershell
-.\build\Release\linweb.exe --screenshot=downloads/example/render.bmp --layout-dump=downloads/example/layout.tsv downloads/example/index.html
+.\build\Release\linweb.exe --screenshot=render.bmp --layout-dump=layout.tsv examples/index.html
 ```
 
 The full build includes parser and pixel/geometry checks in addition to the

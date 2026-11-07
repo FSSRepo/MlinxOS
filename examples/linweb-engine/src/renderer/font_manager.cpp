@@ -2,6 +2,7 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "renderer/font_manager.h"
 #include "utils/file_utils.h"
+#include "utils/memory_files.h"
 #include <fstream>
 #include <iostream>
 #include <algorithm>
@@ -31,12 +32,20 @@ bool FontManager::load_fonts() {
 
 bool FontManager::load_monospace_font(const std::string& path) {
     std::ifstream file(path, std::ios::binary);
-    if (!file) {
+    const auto memory = memory_files::find(path);
+    if (!file && !memory) {
         return false;
     }
 
-    file.read((char*)RendererState::font_mono_buffer, 1 << 20);
-    std::cout << "Monospace font loaded: " << file.gcount() << " bytes." << std::endl;
+    std::streamsize loaded = 0;
+    if (memory) {
+        loaded = static_cast<std::streamsize>(std::min<size_t>(memory->size(), 1 << 20));
+        memcpy(RendererState::font_mono_buffer, memory->data(), static_cast<size_t>(loaded));
+    } else {
+        file.read((char*)RendererState::font_mono_buffer, 1 << 20);
+        loaded = file.gcount();
+    }
+    std::cout << "Monospace font loaded: " << loaded << " bytes." << std::endl;
 
     auto temp_bitmap = std::make_unique<unsigned char[]>(1024 * 1024);
     stbtt_BakeFontBitmap(RendererState::font_mono_buffer, 0, RendererState::base_font_size, temp_bitmap.get(), 1024, 1024, 32, 224, RendererState::cdata_mono);
@@ -57,7 +66,8 @@ bool FontManager::load_monospace_font(const std::string& path) {
 
 bool FontManager::load_font(const std::string& path, bool bold) {
     std::ifstream file(path, std::ios::binary);
-    if (!file) {
+    const auto memory = memory_files::find(path);
+    if (!file && !memory) {
         if (!bold) {
             std::cerr << "CRITICAL: Failed to load font at '" << path << "'. Please check if the file exists." << std::endl;
         }
@@ -69,8 +79,15 @@ bool FontManager::load_font(const std::string& path, bool bold) {
     GLuint& ftex = bold ? RendererState::ftex_bold : RendererState::ftex;
     stbtt_fontinfo& font_info = bold ? RendererState::font_bold_info : RendererState::font_info;
 
-    file.read((char*)buffer, 1 << 20);
-    std::cout << (bold ? "Bold" : "Regular") << " font loaded: " << file.gcount() << " bytes." << std::endl;
+    std::streamsize loaded = 0;
+    if (memory) {
+        loaded = static_cast<std::streamsize>(std::min<size_t>(memory->size(), 1 << 20));
+        memcpy(buffer, memory->data(), static_cast<size_t>(loaded));
+    } else {
+        file.read((char*)buffer, 1 << 20);
+        loaded = file.gcount();
+    }
+    std::cout << (bold ? "Bold" : "Regular") << " font loaded: " << loaded << " bytes." << std::endl;
 
     // stbtt bakes a pixel height spread over ascent - descent, not over the em. Bake at the height
     // that makes one em equal base_font_size; otherwise every advance comes out ~10% narrow (Arial: 2288/2048).

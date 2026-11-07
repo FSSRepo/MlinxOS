@@ -1,5 +1,6 @@
 #include "renderer/custom_font.h"
 #include "renderer/renderer_internal.h"
+#include "utils/memory_files.h"
 #include <algorithm>
 #include <cctype>
 #include <fstream>
@@ -41,7 +42,8 @@ static int requested_weight(const std::string& font_weight) {
 
 bool CustomFonts::add(const std::string& family, const std::string& font_weight, bool italic, const std::string& path) {
     std::ifstream file(path, std::ios::binary);
-    if (!file) {
+    const auto memory = memory_files::find(path);
+    if (!file && !memory) {
         std::cerr << "Could not load the font " << path << std::endl;
         return false;
     }
@@ -49,7 +51,8 @@ bool CustomFonts::add(const std::string& family, const std::string& font_weight,
     font->family = normalized_family(family);
     font->weight = requested_weight(font_weight);
     font->italic = italic;
-    font->data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    if (memory) font->data.assign(memory->begin(), memory->end());
+    else font->data.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
     if (font->data.empty() || stbtt_GetNumberOfFonts(font->data.data()) <= 0) {
         std::cerr << "Not a font file: " << path << std::endl;
         return false;

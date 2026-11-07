@@ -5,7 +5,7 @@ project(LinWebEngine C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-option(LINWEB_BUILD_ENGINE "Build the OpenGL renderer in addition to the downloader" ON)
+option(LINWEB_BUILD_ENGINE "Build the OpenGL renderer in addition to the network library" ON)
 
 # Portable HTTP/TLS library. net_sockets.c uses Winsock on Windows; no POSIX
 # wrapper from node-lite is required. Keep the CA bundle inside the executable.
@@ -32,8 +32,6 @@ add_library(linweb_network STATIC src/network/http_client.cpp src/network/page_d
     "${CMAKE_CURRENT_BINARY_DIR}/linweb_ca.c")
 target_include_directories(linweb_network PUBLIC src)
 target_link_libraries(linweb_network PUBLIC linweb_mbedtls)
-add_executable(linweb-download src/network/download_main.cpp)
-target_link_libraries(linweb-download PRIVATE linweb_network)
 
 # Media: MP3 (OpenMP3), MP4 demuxer + H.264 (FFmpeg's decoder) + AAC (FDK), and the sound device through miniaudio.
 # The headers of the decoders use generic names (types.h, mp4.h, config.h, ...), so their include paths stay private.
@@ -153,6 +151,7 @@ set(LINWEB_SOURCES
     src/scripting/window_bindings.cpp
     src/scripting/media_bindings.cpp
     src/utils/file_utils.cpp
+    src/utils/memory_files.cpp
     src/utils/log.cpp
     src/utils/page_resources.cpp
     src/utils/dom_traversal.cpp

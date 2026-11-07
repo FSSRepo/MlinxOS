@@ -3,6 +3,7 @@
 #include <EGL/egl.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/Xrandr.h>
 #include <X11/keysym.h>
 #include <cstdio>
 #include <chrono>
@@ -12,6 +13,7 @@ namespace linweb {
 struct Window::Impl {
     Display* dpy = nullptr;
     ::Window win = 0;
+    int rr_event_base = -1;   // RandR: its screen-change events (the host or xrandr changed the size of the screen)
     EGLDisplay egl_dpy = EGL_NO_DISPLAY;
     EGLSurface egl_surf = EGL_NO_SURFACE;
     EGLContext egl_ctx = EGL_NO_CONTEXT;
@@ -59,6 +61,15 @@ bool Window::init(int width, int height, const std::string& title) {
 
     width_ = DisplayWidth(impl_->dpy, screen);
     height_ = DisplayHeight(impl_->dpy, screen);
+
+    // Without a window manager nobody resizes a "fullscreen" window when the screen changes size (a VirtualBox guest
+    // follows the size of its window), so the window follows the screen itself.
+    int rr_error_base = 0;
+    if (XRRQueryExtension(impl_->dpy, &impl_->rr_event_base, &rr_error_base)) {
+        XRRSelectInput(impl_->dpy, root, RRScreenChangeNotifyMask);
+    } else {
+        impl_->rr_event_base = -1;
+    }
 
     XSetWindowAttributes swa;
     swa.override_redirect = False;
@@ -185,6 +196,17 @@ void Window::poll_events() const {
     while (XPending(impl_->dpy)) {
         XEvent ev;
         XNextEvent(impl_->dpy, &ev);
+
+        if (impl_->rr_event_base >= 0 && ev.type == impl_->rr_event_base + RRScreenChangeNotify) {
+            // the screen has a new size: the window covers it again (its ConfigureNotify updates the viewport)
+            XRRUpdateConfiguration(&ev);
+            const XRRScreenChangeNotifyEvent* change = reinterpret_cast<const XRRScreenChangeNotifyEvent*>(&ev);
+            if (change->width > 0 && change->height > 0 && (change->width != width_ || change->height != height_)) {
+                XResizeWindow(impl_->dpy, impl_->win, change->width, change->height);
+                XFlush(impl_->dpy);
+            }
+            continue;
+        }
 
         switch (ev.type) {
             case ClientMessage: {
